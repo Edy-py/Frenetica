@@ -13,6 +13,7 @@ dados = pd.read_excel("Formulário de Pedido - Atlética Frenética (respostas).
 # =========================
 col_tel_original = 'Telefone para Contato (WhatsApp)'
 
+
 def formatar_tel(t):
     t = str(t).replace('.0', '')
     t = "".join(filter(str.isdigit, t))
@@ -23,6 +24,7 @@ def formatar_tel(t):
     if len(t) == 10:
         return f'({t[:2]}) {t[2:6]}-{t[6:]}'
     return t
+
 
 # Tenta encontrar a coluna de telefone ignorando maiúsculas/minúsculas
 col_tel_real = next((c for c in dados.columns if c.lower() == col_tel_original.lower()), col_tel_original)
@@ -38,6 +40,7 @@ dados.columns = (
     .str.replace(r'\s+', ' ', regex=True)
 )
 
+
 def deixar_colunas_unicas(cols):
     seen = {}
     out = []
@@ -50,12 +53,15 @@ def deixar_colunas_unicas(cols):
             out.append(c)
     return out
 
+
 dados.columns = deixar_colunas_unicas(dados.columns)
 colunas_originais = list(dados.columns)
 
 # =========================
 # 4. FUNÇÃO DE LIMPEZA COM REMOÇÃO DE "1 UNIDADE"
 # =========================
+
+
 def limpar_lista_v2(valores):
     """Limpa nulos, strings vazias e remove o termo '1 unidade'."""
     if isinstance(valores, pd.Series):
@@ -82,6 +88,7 @@ def limpar_lista_v2(valores):
             
     return resultado
 
+
 # =========================
 # 5. PROCESSAR NOMES E NÚMEROS
 # =========================
@@ -107,6 +114,8 @@ dados["tops"] = dados[col_top].apply(limpar_lista_v2, axis=1)
 # =========================
 # 7. CONSOLIDAR PEDIDOS E TAMANHOS
 # =========================
+
+
 def extrair_pedidos(row):
     p = []
     # Usamos o len() original antes da limpeza radical ou checamos se havia algo
@@ -115,6 +124,7 @@ def extrair_pedidos(row):
     if row["calcas"] or any(pd.notna(row[col_calca])): p.append("Calça")
     if row["tops"] or any(pd.notna(row[col_top])): p.append("Top")
     return ", ".join(list(set(p))) if p else "Nenhum"
+
 
 dados["pedidos_resumo"] = dados.apply(extrair_pedidos, axis=1)
 
