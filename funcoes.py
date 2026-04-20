@@ -88,9 +88,9 @@ def gerar_mensagens(df):
         # Pagamento
         forma = str(row['Forma de Pagamento']).upper()
         if "PIX" in forma:
-            pag_info = "🔑 *Chave PIX:* freneticaufcat@gmail.com\n*(Favor enviar o comprovante para este contato Alfredo -> +55 64 9948-5869)*"
+            pag_info = "🔑 *Chave PIX:* freneticaufcat@gmail.com\n*(Favor enviar o comprovante para este contato Alfredo -> +55 XX XXXXX-XXXX)*"
         elif "CARTAO" in forma or "CARTÃO" in forma:
-            pag_info = f"💳 *Pagamento no Cartão:* Receberemos por link de pagamento.\n(Favor enviar mensagem para esse número *+55 64 9948-5869 -> Alfredo*)\n Envie esta mensagem: Meu nome é *{row['Cliente']}* e gostaria do meu link de pagamento no valor de *R$ {valor:.2f}*"
+            pag_info = f"💳 *Pagamento no Cartão:* Receberemos por link de pagamento.\n(Favor enviar mensagem para esse número *+55 XX XXXXX-XXXX -> Alfredo*)\n Envie esta mensagem: Meu nome é *{row['Cliente']}* e gostaria do meu link de pagamento no valor de *R$ {valor:.2f}*"
         else:
             pag_info = f"💳 *Pagamento:* {row['Forma de Pagamento']}"
 
