@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from data_manager import clear_cache
 import streamlit as st
 import pandas as pd
 from database import get_session, Estoque, Vendas, Associados
@@ -114,6 +115,7 @@ def render_vendas(can_edit_status=False):
                     if prod_db: prod_db.quantidade -= item['qtd']
                 
                 session.commit()
+                clear_cache() # Limpar cache
                 st.success(v["MSG_SUCESSO"])
                 if metodo_sel == "Pix": st.info(s.MSG_PAGAMENTO_PIX); st.link_button("📤 Enviar comprovante", s.LINK_WHATSAPP_FIN)
                 st.session_state.carrinho = []
@@ -153,7 +155,10 @@ def render_vendas(can_edit_status=False):
                 for _, row in edited_df.iterrows():
                     v_up = session.query(Vendas).filter_by(id=row['ID']).first()
                     if v_up: v_up.status_pagamento = row['Status']
-                session.commit(); st.success("Atualizado!"); st.rerun()
+                session.commit() 
+                clear_cache() # Limpar cache
+                st.success("Atualizado!")
+                st.rerun()
         else: st.dataframe(df_vendas, use_container_width=True, hide_index=True)
         
         st.download_button("📥 Exportar CSV", df_vendas.to_csv(index=False).encode('utf-8-sig'), f"vendas_{d_ini}.csv", "text/csv")
@@ -167,6 +172,6 @@ def render_vendas(can_edit_status=False):
                 if v_rem:
                     p_est = session.query(Estoque).filter_by(nome_produto=v_rem.nome_prod).first()
                     if p_est: p_est.quantidade += v_rem.qtd_vendida
-                    session.delete(v_rem); session.commit(); st.rerun()
+                    session.delete(v_rem); session.commit(); clear_cache(); st.rerun()
 
     session.close()

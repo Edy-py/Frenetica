@@ -8,6 +8,7 @@ from strings_config import LOJA as l
 from strings_config import VENDAS as v 
 import pandas as pd
 import datetime
+from data_manager import clear_cache 
 
 def render_compras():
     session = get_session()
@@ -66,6 +67,7 @@ def render_compras():
                             nova_adesao = Associados(nome=clean_text(novo_nome), codigo_unico=cpf_limpo, telefone=tel_limpo, status="Inativo")
                             session.add(nova_adesao)
                             session.commit()
+                            clear_cache() # Limpar cache
                             st.success(f"Bem vindo a {s.ATLETICA_NOME}")
                             st.link_button("Enviar comprovante", s.LINK_WHATSAPP_FIN)
                         except:
@@ -142,6 +144,7 @@ def render_compras():
 
                 session.commit()
                 st.balloons()
+                clear_cache() # Limpar cache
                 if metodo_sel == "Pix":
                     st.info(s.MSG_PAGAMENTO_PIX)
                     st.link_button("📤 Enviar Comprovante", s.LINK_WHATSAPP_FIN)

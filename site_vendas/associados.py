@@ -5,6 +5,7 @@ import os
 from database import get_session, Associados, Parceiros
 from utils import clean_text, get_base64_image, format_telefone, validar_cpf, validar_telefone
 import strings_config as s 
+from data_manager import clear_cache
 
 so = s.SOCIOS 
 
@@ -46,7 +47,10 @@ def render_associados():
                     else:
                         try:
                             session.add(Associados(nome=clean_text(nome_s), telefone=tel_limpo, codigo_unico=cpf_limpo, status="Ativo"))
-                            session.commit(); st.success(so["MSG_SUCESSO"]); st.rerun()
+                            session.commit()
+                            clear_cache() # Limpar cache
+                            st.success(so["MSG_SUCESSO"]) 
+                            st.rerun()
                         except:
                             session.rollback(); st.error(so["MSG_EXISTE"])
 
@@ -62,7 +66,10 @@ def render_associados():
                             from utils import salvar_imagem
                             nome_logo = salvar_imagem(logo_arq, "parceiros") if logo_arq else None
                             session.add(Parceiros(nome=nome_p.upper().strip(), vantagem=vantagem_p, logo_url=nome_logo))
-                            session.commit(); st.success(s.MSG_SUCESSO_PARCERIA); st.rerun()
+                            session.commit() 
+                            clear_cache() # Limpar cache
+                            st.success(s.MSG_SUCESSO_PARCERIA) 
+                            st.rerun()
                         except:
                             session.rollback(); st.error("Erro ao salvar parceiro.")
 
@@ -86,7 +93,10 @@ def render_associados():
                 novo_status = st.selectbox("Alterar Status:", ["Ativo", "Inativo"], index=(0 if socio_edit.status == "Ativo" else 1))
                 if st.button("Confirmar Alteração", use_container_width=True, type="primary"):
                     socio_edit.status = novo_status
-                    session.commit(); st.success("Status Atualizado!"); st.rerun()
+                    session.commit() 
+                    clear_cache() # Limpar cache
+                    st.success("Status Atualizado!") 
+                    st.rerun()
             elif c_busca or n_busca: st.warning(so["MSG_NAO_ENCONTRADO"])
 
         st.subheader(so["LISTA_TITULO"])

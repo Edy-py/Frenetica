@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 from database import get_session, Estoque
 from utils import clean_text, format_currency, salvar_imagem
+from data_manager import get_estoque_df, clear_cache  # Importando o novo gestor
 import strings_config as s
 from strings_config import ESTOQUE as es
 
@@ -41,11 +42,16 @@ def render_estoque(readonly=True):
                                     personalizavel=(p_opcao == "Sim"), 
                                     foto_url=salvar_imagem(foto_arq, "produtos") if foto_arq else None
                                 )
-                                session.add(novo); session.commit()
-                                st.success(f"Sucesso: {nome_up} cadastrado!"); st.rerun()
+                                session.add(novo)
+                                session.commit()
+                                clear_cache()  # Limpa o cache para atualizar a tabela
+                                st.success(f"Sucesso: {nome_up} cadastrado!")
+                                st.rerun()
                             except Exception as e:
-                                session.rollback(); st.error(f"Erro: {e}")
-                    else: st.error(es["MSG_NOME_OBRIGATORIO"])
+                                session.rollback()
+                                st.error(f"Erro: {e}")
+                    else: 
+                        st.error(es["MSG_NOME_OBRIGATORIO"])
 
     # --- LÓGICA 2: ATUALIZAR POR ID ---
     elif tipo_operacao == es["OPERACAO_OPCOES"][1] and not readonly:
@@ -68,17 +74,25 @@ def render_estoque(readonly=True):
                         try:
                             item.nome_produto, item.quantidade = clean_text(edit_nome), edit_qtd
                             item.preco_custo, item.preco_venda_un = edit_pc, edit_pv
-                            if edit_foto: item.foto_url = salvar_imagem(edit_foto, "produtos")
-                            session.commit(); st.success(es["MSG_EDIT_SUCESSO"]); st.rerun()
+                            if edit_foto: 
+                                item.foto_url = salvar_imagem(edit_foto, "produtos")
+                            session.commit()
+                            clear_cache()  # Limpa o cache após editar
+                            st.success(es["MSG_EDIT_SUCESSO"])
+                            st.rerun()
                         except Exception as e:
-                            session.rollback(); st.error(f"Erro: {e}")
-            else: st.warning("ID não encontrado")
+                            session.rollback()
+                            st.error(f"Erro: {e}")
+            else: 
+                st.warning("ID não encontrado")
 
     # --- LÓGICA 3: GERENCIAR KITS ---
     elif tipo_operacao == es["OPERACAO_OPCOES"][2] and not readonly:
         st.subheader(es["CAD_KIT_EXPANDER"])
         with st.form("form_cad_kit"):
             nome_kit = st.text_input(es["LABEL_NOME_KIT"], placeholder=es["PLACEHOLDER_KIT"])
+            
+            # Busca direta para o multiselect (dados sensíveis a mudanças rápidas)
             prods_all = session.query(Estoque).all()
             opcoes_dict = {p.nome_produto: p for p in prods_all}
             selecionados = st.multiselect("Selecione os produtos", options=list(opcoes_dict.keys()))
@@ -97,27 +111,36 @@ def render_estoque(readonly=True):
                             personalizavel=any(opcoes_dict[it].personalizavel for it in selecionados),
                             foto_url=salvar_imagem(foto_kit, "produtos") if foto_kit else None
                         )
-                        session.add(novo_kit); session.commit()
-                        st.success(es["MSG_KIT_SUCESSO"].format(nome=nome_k_up)); st.rerun()
+                        session.add(novo_kit)
+                        session.commit()
+                        clear_cache()  # Limpa o cache após criar kit
+                        st.success(es["MSG_KIT_SUCESSO"].format(nome=nome_k_up))
+                        st.rerun()
                     except Exception as e:
-                        session.rollback(); st.error(f"Erro ao criar kit: {e}")
-                else: st.error(es["MSG_ERRO_ITENS_KIT"])
+                        session.rollback()
+                        st.error(f"Erro ao criar kit: {e}")
+                else: 
+                    st.error(es["MSG_ERRO_ITENS_KIT"])
 
     st.divider()
 
-    # --- TABELA DE VISUALIZAÇÃO ---
+    # --- TABELA DE VISUALIZAÇÃO (OTIMIZADA COM CACHE) ---
     st.subheader(es["SUB_ESTOQUE_DISPONIVEL"])
-    dados = session.query(Estoque).order_by(Estoque.id.desc()).all()
     
-    if dados:
-        df = pd.DataFrame([{
-            es["COLUNAS"][0]: i.id,
-            es["COLUNAS"][1]: i.nome_produto,
-            es["COLUNAS"][2]: i.quantidade,
-            es["COLUNAS"][3]: format_currency(i.preco_venda_un),
-            es["COLUNAS"][4]: "✅" if i.personalizavel else "❌"
-        } for i in dados])
-        st.dataframe(df, use_container_width=True, hide_index=True)
+    # Chama o DataFrame do data_manager que usa @st.cache_data
+    df_raw = get_estoque_df()
+    
+    if not df_raw.empty:
+        # Reconstrói a visualização mantendo as chaves de colunas originais do config
+        df_vis = pd.DataFrame([{
+            es["COLUNAS"][0]: row['id'],
+            es["COLUNAS"][1]: row['nome_produto'],
+            es["COLUNAS"][2]: row['quantidade'],
+            es["COLUNAS"][3]: format_currency(row['preco_venda_un']),
+            es["COLUNAS"][4]: "✅" if row['personalizavel'] else "❌"
+        } for _, row in df_raw.iterrows()])
+        
+        st.dataframe(df_vis, use_container_width=True, hide_index=True)
     else:
         st.info(s.MSG_ESTOQUE_VAZIO)
     
