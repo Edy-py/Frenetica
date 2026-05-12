@@ -174,7 +174,7 @@ CORES_STATUS = {
 # 8. MENSAGENS DE ERRO E VALIDAÇÃO (Globais)
 # ==============================================================================
 MSG_ERRO_CPF = "⚠️ CPF inválido! Verifique os números digitados."
-MSG_ERRO_TELEFONE = "⚠️ Telefone inválido! Use o formato: 64912345678."
+MSG_ERRO_TELEFONE = "⚠️ Telefone inválido! Use o formato: (XX) XXXXX-XXXX."
 MSG_ERRO_CAMPOS = "⚠️ Preencha todos os campos obrigatórios."
 
 # ORIENTAÇÕES DE PAGAMENTO

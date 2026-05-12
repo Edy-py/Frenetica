@@ -1,7 +1,10 @@
 .venv/
+venv/
 anunciar_eventos/images/anuncio_desconto.jpeg
 anunciar_eventos/contatos_ufcat.xlsx
 *.ipynb
 dados_reais/
 __pycache__/
 anunciar_eventos/
+site_vendas/.streamlit/secrets.toml
+site_vendas/*.db

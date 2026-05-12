@@ -113,6 +113,7 @@ def render_vendas(can_edit_status=False):
                     valor_venda_item = float(item['subtotal'] - desc_por_item)
                     custo_total_item = float(custo_un * item['qtd'])
                     lucro_calculado = float(valor_venda_item - custo_total_item)
+                    print(f"DEBUG: Produto: {item['produto']}, Preço Base: {item['preco']}, Subtotal: {item['subtotal']}, Desconto por item: {desc_por_item}, Valor final item: {valor_venda_item}, Custo total item: {custo_total_item}, Lucro calculado: {lucro_calculado}")
                     
                     nova_venda = Vendas(
                         nome_prod=item['produto'], 
@@ -129,6 +130,10 @@ def render_vendas(can_edit_status=False):
                         is_associado=(desconto > 0)
                     )
                     session.add(nova_venda)
+                    print(f"DEBUG: lucro_calculado para {item['produto']}: {lucro_calculado}")
+                    # pegar do bd e ver o lucro real que tá salvando, comparar com o calculado, ver se tem algo estranho acontecendo
+                    lucro_real = session.query(Vendas.lucro).filter(Vendas.nome_prod == item['produto']).first()
+                    print(f"DEBUG: lucro_real do banco para {item['produto']}: {lucro_real}")
                     
                     # Baixa no estoque
                     if prod_db: 
@@ -136,12 +141,13 @@ def render_vendas(can_edit_status=False):
                 
                 session.commit()
                 st.success(v["MSG_SUCESSO"])
+                st.session_state.carrinho = []  # Limpa o carrinho após a venda
                 
                 if metodo_sel == "Pix":
                     st.info(s.MSG_PAGAMENTO_PIX)
                     st.link_button("📤 Enviar comprovante", s.LINK_WHATSAPP_FIN)
                 
-                st.session_state.carrinho = []
+                # st.session_state.carrinho = []
                 st.rerun()
                 
             except Exception as e:

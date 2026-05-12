@@ -6,6 +6,8 @@ from utils import format_currency, clean_text, validar_cpf, validar_telefone
 import strings_config as s
 from strings_config import LOJA as l # Atalho para escrever menos
 from strings_config import VENDAS as v # Atalho para escrever menos
+import pandas as pd
+import datetime
 
 
 def render_compras():
@@ -127,78 +129,104 @@ def render_compras():
                     })
                     st.toast(f"{p.nome_produto} adicionado!")
 
-    # --- CARRINHO DO CLIENTE ---
+    # --- SEÇÃO 2: CARRINHO E FINALIZAÇÃO (SINCRONIZADO COM VENDAS.PY) ---
     if st.session_state.carrinho_cliente:
         st.divider()
-        st.subheader("Resumo do pedido")
+        st.subheader("🛒 Seu Carrinho")
         
-        for i, item in enumerate(list(st.session_state.carrinho_cliente)):
-            col_info, col_pers, col_remove = st.columns([2, 2, 1])
-            col_info.write(f"**{item['nome']}**\n{format_currency(item['preco'])}")
-            
-            if item['personalizavel']:
-                item['personalizacao'] = col_pers.text_input(
-                    f"{l['LABEL_PERS']}", 
-                    key=f"pers_{item['id_sessao']}",
-                    placeholder=s.PLACEHOLDER_PERSONALIZACAO
-                )
-            
-            if col_remove.button(f"🗑️ {item['nome']}", key=f"rem_{item['id_sessao']}", help="Clique para remover este item"):
-                st.session_state.carrinho_cliente.pop(i)
+        # Criar DataFrame para exibição limpa
+        df_cart = pd.DataFrame(st.session_state.carrinho_cliente)
+        
+        # Renomear colunas para o usuário
+        df_display = df_cart[['nome', 'personalizacao']].copy()
+        df_display.columns = ['Produto', 'Personalização']
+        
+        st.table(df_display)
+        
+        # Cálculo do Total Bruto
+        total_bruto = sum(item['preco'] for item in st.session_state.carrinho_cliente)
+        
+        # Lógica de Desconto (Persistente da Sidebar)
+        desconto = 0.0
+        if st.session_state.get("socio_logado"):
+            desconto = total_bruto * s.DESCONTO_VALOR
+            st.success(f"✅ Desconto de Sócio aplicado: {format_currency(desconto)}")
+
+        total_final = total_bruto - desconto
+        st.markdown(f"### Total a Pagar: :green[{format_currency(total_final)}]")
+
+        # Informações de Pagamento
+        metodo_sel, tamanho_sel = st.columns(2)
+        with metodo_sel:
+            metodo_sel = st.selectbox(v["LABEL_PAGAMENTO"], v["OPCOES_PAGAMENTO"], key="compra_metodo_pag")
+
+        with tamanho_sel:
+            tamanho_sel = st.selectbox(v["LABEL_TAMANHO"], v["OPCOES_TAMANHO"], key="compra_tamanho")
+        
+        if any(item['personalizavel'] for item in st.session_state.carrinho_cliente):
+            personalizacao = st.text_input("Personalização", placeholder="Digite o nome e número neste modelo <nome-número>", key="compra_personalizacao")
+
+        col_btn1, col_btn2 = st.columns(2)
+        
+        if col_btn1.button("✅ Finalizar Pedido", use_container_width=True, type="primary"):
+            try:
+                # Dados do cliente (se logado como sócio ou anônimo)
+                info_socio = st.session_state.get("socio_logado")
+                nome_cli = info_socio['nome'] if info_socio else "CLIENTE LOJA"
+                tel_cli = info_socio['telefone'] if info_socio else ""
+                
+                qtd_itens = len(st.session_state.carrinho_cliente)
+                desc_por_item = desconto / qtd_itens if qtd_itens > 0 else 0.0
+
+                for item in st.session_state.carrinho_cliente:
+                    # Busca produto no DB para custos e estoque
+                    prod_db = session.query(Estoque).filter_by(id=item['id_db']).first()
+                    custo_un = float(prod_db.preco_custo) if prod_db and prod_db.preco_custo else 0.0
+                    
+                    # Cálculo financeiro
+                    valor_venda_item = float(item['preco'] - desc_por_item)
+                    lucro_item = valor_venda_item - custo_un
+                    
+                    # Registra a Venda
+                    nova_venda = Vendas(
+                        nome_prod=item['nome'],
+                        qtd_vendida=1,
+                        preco_venda_total=valor_venda_item,
+                        data=datetime.datetime.now(),
+                        lucro=lucro_item,
+                        nome_cliente=nome_cli,
+                        telefone=tel_cli,
+                        tamanho=tamanho_sel,
+                        personalizacao=personalizacao if personalizacao else None,
+                        metodo_pagamento=metodo_sel,
+                        status_pagamento="Pagamento Pendente",
+                        is_associado=(desconto > 0)
+                    )
+                    session.add(nova_venda)
+                    
+                    # Baixa no Estoque
+                    if prod_db and prod_db.quantidade > 0:
+                        prod_db.quantidade -= 1
+
+                session.commit()
+                st.balloons()
+                st.success("Pedido realizado com sucesso!")
+                
+                # Instruções de PIX se necessário
+                if metodo_sel == "Pix":
+                    st.info(s.MSG_PAGAMENTO_PIX)
+                    st.link_button("📤 Enviar Comprovante", s.LINK_WHATSAPP_FIN)
+                
+                # Limpa carrinho e recarrega
+                st.session_state.carrinho_cliente = []
                 st.rerun()
 
-        # FINALIZAÇÃO
-        with st.form("finalizar_compra_cliente"):
+            except Exception as e:
+                session.rollback()
+                st.error(f"Erro ao processar compra: {e}")
 
-            if st.session_state.socio_logado:
-                nome_s_state = st.session_state.socio_logado.get('nome', "")
-                tel_s_state = st.session_state.socio_logado.get('telefone', "")
-            else:
-                nome_s_state = ""
-                tel_s_state = ""
+        if col_btn2.button("🗑️ Esvaziar Carrinho", use_container_width=True):
+            st.session_state.carrinho_cliente = []
+            st.rerun()
 
-            nome_cli = st.text_input(v["LABEL_NOME_CLIENTE"], value=nome_s_state, key="finalizar_nome")
-            tel_cli = st.text_input(v["LABEL_TEL_CLIENTE"], value=tel_s_state, key="finalizar_tel")
-            total = sum(it['preco'] for it in st.session_state.carrinho_cliente)
-            
-            st.markdown(f"### Total: :green[{format_currency(total)}]")
-            
-            if st.form_submit_button("Finalizar Compra", use_container_width=True):
-                # Validação de tel antes de finalizar
-                sucesso_tel_fim, tel_limpo_fim = validar_telefone(tel_cli)
-                
-                if not sucesso_tel_fim:
-                    st.error(s.MSG_ERRO_TELEFONE)
-                elif nome_cli:
-                    try:
-                        for item in st.session_state.carrinho_cliente:
-                            p_db = session.query(Estoque).filter_by(id=item['id_db']).with_for_update().first()
-                            if p_db.quantidade > 0:
-                                nova_venda = Vendas(
-                                    nome_prod=item['nome'], qtd_vendida=1,
-                                    preco_venda_total=item['preco'], nome_cliente=clean_text(nome_cli),
-                                    telefone=tel_limpo_fim, personalizacao=item['personalizacao'],
-                                    is_associado=desconto_ativo, status_pagamento="Pagamento Pendente"
-                                )
-                                session.add(nova_venda)
-                                p_db.quantidade -= 1
-                            else:
-                                st.error(l["MSG_ESGOTADO"].format(nome=item['nome']))
-                                session.rollback()
-                                return
-                        
-                        session.commit()
-                        st.success("Compra registrada com sucesso!!")
-                        
-                        # Mostra instruções de PIX se for o caso
-                        st.markdown(s.MSG_PAGAMENTO_PIX)
-                        st.link_button("📤 Enviar Comprovante", s.LINK_WHATSAPP_FIN)
-                        
-                        st.session_state.carrinho_cliente = []
-                        
-                    except Exception as e:
-                        session.rollback()
-                        st.error(f"Erro: {e}")
-                else:
-                    st.error(s.MSG_ERRO_TELEFONE)
     session.close()
