@@ -18,25 +18,24 @@ def render_dashboard():
     col1, col2, col3 = st.columns(3)
     
     if vendas:
-        # 1. Criamos o DataFrame garantindo tipos numéricos (float e int)
+        # 1. DataFrame centralizado com tratamento de tipos
         df_v = pd.DataFrame([(v.nome_prod, v.qtd_vendida, v.lucro) for v in vendas], 
                              columns=['Produto', 'Quantidade', 'Lucro'])
         
-        # FORÇAR CONVERSÃO (Caso o banco retorne algo estranho)
         df_v['Lucro'] = pd.to_numeric(df_v['Lucro'], errors='coerce').fillna(0)
         df_v['Quantidade'] = pd.to_numeric(df_v['Quantidade'], errors='coerce').fillna(0)
         
-        # 2. Total de Vendas
-        col1.metric(d["METRICA_VENDAS"], len(vendas))
+        # 2. Métricas de Resumo
+        total_vendas_qtd = len(vendas)
+        total_lucro = float(df_v['Lucro'].sum())
         
-        # 3. Produto mais vendido
-        ranking_vendas = df_v.groupby('Produto')['Quantidade'].sum()
+        # 3. Ranking para métrica e gráfico
+        ranking_vendas = df_v.groupby('Produto')['Quantidade'].sum().sort_values(ascending=False)
         mais_vendido_nome = ranking_vendas.idxmax()
         mais_vendido_qtd = ranking_vendas.max()
-        col2.metric(label=d["METRICA_PROD_MAIS_VENDIDO"], value=f"{mais_vendido_nome} ({int(mais_vendido_qtd)})")
         
-        # 4. Lucro acumulado - A SOMA AGORA VAI FUNCIONAR
-        total_lucro = float(df_v['Lucro'].sum())
+        col1.metric(d["METRICA_VENDAS"], total_vendas_qtd)
+        col2.metric(label=d["METRICA_PROD_MAIS_VENDIDO"], value=f"{mais_vendido_nome} ({int(mais_vendido_qtd)})")
         col3.metric(d["METRICA_LUCRO"], format_currency(total_lucro))
     else:
         col1.metric(d["METRICA_VENDAS"], 0)
@@ -56,36 +55,37 @@ def render_dashboard():
         fig_est = px.bar(
             df_est, x='Produto', y='Qtd', color='Status',
             color_discrete_map=s.CORES_STATUS,
-            text_auto=True
+            text_auto=True,
+            category_orders={"Status": [d["LABEL_STATUS_CRITICO"], d["LABEL_STATUS_ALERTA"], d["LABEL_STATUS_OK"]]}
         )
-        fig_est.update_layout(height=500, font=dict(size=16))
+        fig_est.update_layout(height=450, font=dict(size=14), margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig_est, use_container_width=True)
     else:
         st.info(d["MSG_SEM_ESTOQUE"])
 
     st.divider()
 
-    # --- GRÁFICO 2: RANKING DE VENDAS (COM ESCALA VIRIDIS) ---
+    # --- GRÁFICO 2: RANKING DE VENDAS ---
     st.subheader(d["GRAFICO_RANKING"])
     if vendas:
-        df_ranking = df_v.groupby('Produto')['Quantidade'].sum().reset_index()
-        df_ranking = df_ranking.sort_values(by='Quantidade', ascending=False)
+        df_plot_ranking = ranking_vendas.reset_index()
 
         fig_vendas = px.bar(
-            df_ranking, 
+            df_plot_ranking, 
             x='Produto', 
             y='Quantidade',
-            text='Quantidade',
-            color='Quantidade', # Define que a cor segue a escala numérica
-            color_continuous_scale="Viridis" # Aplica o degradê Viridis
+            text_auto='.0f',
+            color='Quantidade',
+            color_continuous_scale="Viridis"
         )
 
         fig_vendas.update_layout(
-            height=600, 
-            font=dict(size=16),
-            xaxis=dict(tickangle=-45),
-            yaxis=dict(tickformat='d', dtick=1),
-            coloraxis_showscale=False # Esconde a barra lateral de cores para ficar mais limpo
+            height=500, 
+            font=dict(size=14),
+            xaxis=dict(tickangle=-45, title=""),
+            yaxis=dict(tickformat='d', title="Qtd Vendida"),
+            coloraxis_showscale=False,
+            margin=dict(t=20, b=20, l=20, r=20)
         )
         st.plotly_chart(fig_vendas, use_container_width=True)
     else:
