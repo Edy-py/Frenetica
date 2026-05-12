@@ -35,7 +35,7 @@ def login():
     if not st.session_state.auth:
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            st.markdown("### 🐯 Portal Frenética")
+            st.markdown("### 🦣 Portal Frenética")
             st.caption("Sistema de Gestão de Vendas e Associados")
             
             u = st.text_input("Usuário").lower().strip()
