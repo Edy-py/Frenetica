@@ -23,7 +23,7 @@ LINK_WHATSAPP_FIN = f"https://wa.me/55{FINANCEIRO_WHATSAPP}?text=Olá! Segue o c
 # 2. MENU PRINCIPAL (Usado no main.py)
 # ==============================================================================
 TITULO_PAGINA = f"Portal {ATLETICA_NOME} - Gestão"
-ICON_PAGINA = "🛒"
+ICON_PAGINA = "icons/icone_aba.png"
 TEXTO_BANNER = f"ATLÉTICA {ATLETICA_NOME.upper()}"
 
 NOMES_ABAS = {
