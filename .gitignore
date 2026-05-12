@@ -1,4 +1,5 @@
 .venv/
+venv/
 anunciar_eventos/images/anuncio_desconto.jpeg
 anunciar_eventos/contatos_ufcat.xlsx
 *.ipynb
