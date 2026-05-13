@@ -8,3 +8,5 @@ __pycache__/
 anunciar_eventos/
 /venv/
 site_vendas/.streamlit/secrets.toml
+imagens/parceiros/*.png
+imagens/produtos/*.png
