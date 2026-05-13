@@ -156,7 +156,13 @@ def render_loja_dinamica(session):
                 b64 = get_base64_image(path) if p.foto_url and os.path.exists(path) else None
                 img_html = f'<img src="data:image/png;base64,{b64}" class="img-produto">' if b64 else '<div class="img-produto" style="display:flex;align-items:center;justify-content:center;">🖼️ Sem Foto</div>'
                 
-                v_unitario = p.preco_venda_un * (1 - s.DESCONTO_VALOR) if desconto_ativo else p.preco_venda_un
+                is_kit = "[KIT]" in p.nome_produto
+                
+                # Aplica desconto apenas se NÃO for kit
+                if desconto_ativo and not is_kit:
+                    v_unitario = p.preco_venda_un * (1 - s.DESCONTO_VALOR)
+                else:
+                    v_unitario = p.preco_venda_un
                 
                 # Render do Card HTML
                 st.markdown(f"""

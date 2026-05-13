@@ -193,7 +193,7 @@ def render_vendas(can_edit_status=False):
                     
                     perso = ""
                     if obj_p.personalizavel:
-                        perso = st.text_input("Personalização")
+                        perso = st.text_input("Personalização", placeholder="Ex: Nome e número para camisa <nome-número>")
 
                     if st.form_submit_button(v["BOTAO_ADD"], use_container_width=True):
                         sucesso_tel, tel_limpo = validar_telefone(tel_c)
