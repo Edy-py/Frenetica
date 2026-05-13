@@ -8,11 +8,9 @@ import strings_config as s
 from strings_config import DASH as d 
 
 def render_dashboard():
-    st.header(d["TITULO"])
     
-    # Busca de dados via Cache
-    df_v = get_vendas_df()
-    df_e = get_estoque_df()
+    st.header(s.DASH["TITULO"]) 
+    session = get_session()
 
     # --- MÉTRICAS PRINCIPAIS ---
     col1, col2, col3 = st.columns(3)
@@ -43,24 +41,26 @@ def render_dashboard():
 
     st.divider()
 
-    # --- GRÁFICO 1: NÍVEIS DE ESTOQUE ---
-    st.subheader(d["GRAFICO_ESTOQUE"])
-    if not df_e.empty:
-        df_e['Status_Estoque'] = df_e['quantidade'].apply(
-            lambda q: d["LABEL_STATUS_CRITICO"] if q < 1 else (d["LABEL_STATUS_ALERTA"] if q <= 5 else d["LABEL_STATUS_OK"])
-        )
-            
-        fig_est = px.bar(
-            df_e, x='nome_produto', y='quantidade', color='Status_Estoque',
-            color_discrete_map=s.CORES_STATUS,
-            text_auto=True,
-            category_orders={"Status_Estoque": [d["LABEL_STATUS_CRITICO"], d["LABEL_STATUS_ALERTA"], d["LABEL_STATUS_OK"]]}
-        )
-        fig_est.update_layout(height=450, margin=dict(t=20, b=20, l=20, r=20))
-        st.plotly_chart(fig_est, use_container_width=True)
-    else:
-        st.info(d["MSG_SEM_ESTOQUE"])
+    # --- GRÁFICOS ---
+    g1, g2 = st.columns(2)
 
+    with g1:
+        st.subheader(s.DASH["GRAFICO_ESTOQUE"]) 
+        if not vendas_por_dia.empty:
+            fig_vendas = px.line(vendas_por_dia, x='Data', y='preco_venda_total', 
+                                 title="Faturamento Diário", markers=True)
+            fig_vendas.update_traces(line_color=s.COR_AZUL_MARCA) # Identidade visual
+            st.plotly_chart(fig_vendas, use_container_width=True)
+
+    with g2:
+        st.subheader(s.DASH["GRAFICO_RANKING"])
+        if not df_vendas.empty:
+            top_prods = df_vendas.groupby('Produto')['qtd_vendida'].sum().nlargest(5).reset_index()
+            fig_bar = px.bar(top_prods, x='Produto', y='qtd_vendida', 
+                             title="Qtd Vendida por Produto", color_discrete_sequence=[s.COR_AMARELO_MARCA])
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+    # --- TABELA DE ESTOQUE CRÍTICO ---
     st.divider()
 
     # --- GRÁFICO 2: RANKING DE VENDAS ---

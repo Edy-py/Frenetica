@@ -19,7 +19,7 @@ def render_estoque(readonly=True):
     # --- LÓGICA 1: VISUALIZAR / CADASTRAR NOVO PRODUTO ---
     if tipo_operacao == es["OPERACAO_OPCOES"][0] and not readonly:
         with st.expander(es["CAD_PROD_EXPANDER"], expanded=False):
-            with st.form("form_cadastro_prod"):
+            with st.form("form_cadastro_prod", clear_on_submit=True):
                 nome = st.text_input(es["LABEL_NOME"], placeholder=s.PLACEHOLDER_PRODUTO)
                 c1, c2, c3 = st.columns(3)
                 qtd = c1.number_input(es["LABEL_QTD"], min_value=0)
@@ -46,7 +46,6 @@ def render_estoque(readonly=True):
                                 session.commit()
                                 clear_cache()  # Limpa o cache para atualizar a tabela
                                 st.success(f"Sucesso: {nome_up} cadastrado!")
-                                st.rerun()
                             except Exception as e:
                                 session.rollback()
                                 st.error(f"Erro: {e}")
@@ -115,7 +114,6 @@ def render_estoque(readonly=True):
                         session.commit()
                         clear_cache()  # Limpa o cache após criar kit
                         st.success(es["MSG_KIT_SUCESSO"].format(nome=nome_k_up))
-                        st.rerun()
                     except Exception as e:
                         session.rollback()
                         st.error(f"Erro ao criar kit: {e}")

@@ -32,27 +32,28 @@ def render_associados():
         
         with tab1:
             with st.expander(so["EXPANDER_CADASTRO"], expanded=False):
-                c1, c2, c3 = st.columns(3)
-                nome_s = c1.text_input(so["LABEL_NOME"], key="cad_nome_socio")
-                tel_s = c2.text_input(so["LABEL_TEL"], placeholder=s.PLACEHOLDER_TELEFONE, key="cad_tel_socio")
-                cpf_input = c3.text_input(so["LABEL_CPF"], placeholder=s.PLACEHOLDER_CPF, key="cad_cpf_socio")
-                
-                if st.button(so["BOTAO_SALVAR"], use_container_width=True, type="primary"):
-                    sucesso_cpf, cpf_limpo = validar_cpf(cpf_input)
-                    sucesso_tel, tel_limpo = validar_telefone(tel_s)
+                with st.form("form_cad_socio", clear_on_submit=True):
+                    c1, c2, c3 = st.columns(3)
+                    nome_s = c1.text_input(so["LABEL_NOME"])
+                    tel_s = c2.text_input(so["LABEL_TEL"], placeholder=s.PLACEHOLDER_TELEFONE)
+                    cpf_input = c3.text_input(so["LABEL_CPF"], placeholder=s.PLACEHOLDER_CPF)
                     
-                    if not nome_s: st.error(s.MSG_ERRO_CAMPOS)
-                    elif not sucesso_cpf: st.error(s.MSG_ERRO_CPF)
-                    elif not sucesso_tel: st.error(s.MSG_ERRO_TELEFONE)
-                    else:
-                        try:
-                            session.add(Associados(nome=clean_text(nome_s), telefone=tel_limpo, codigo_unico=cpf_limpo, status="Ativo"))
-                            session.commit()
-                            clear_cache() # Limpar cache
-                            st.success(so["MSG_SUCESSO"]) 
-                            st.rerun()
-                        except:
-                            session.rollback(); st.error(so["MSG_EXISTE"])
+                    if st.form_submit_button(so["BOTAO_SALVAR"], use_container_width=True, type="primary"):
+                        sucesso_cpf, cpf_limpo = validar_cpf(cpf_input)
+                        sucesso_tel, tel_limpo = validar_telefone(tel_s)
+                        
+                        if not nome_s: st.error(s.MSG_ERRO_CAMPOS)
+                        elif not sucesso_cpf: st.error(s.MSG_ERRO_CPF)
+                        elif not sucesso_tel: st.error(s.MSG_ERRO_TELEFONE)
+                        else:
+                            try:
+                                session.add(Associados(nome=clean_text(nome_s), telefone=tel_limpo, codigo_unico=cpf_limpo, status="Ativo"))
+                                session.commit()
+                                clear_cache()
+                                st.success(so["MSG_SUCESSO"])
+                            except:
+                                session.rollback()
+                                st.error(so["MSG_EXISTE"])
 
         with tab2:
             with st.expander("Cadastrar novos parceiros", expanded=False):
@@ -77,7 +78,7 @@ def render_associados():
     if role in ["admin", "financeiro"]:
         st.divider()
         with st.expander(so["EXPANDER_STATUS"], expanded=False):
-            socio_edit = None 
+    
             col1, col2 = st.columns(2)
             c_busca = col1.text_input(so["BUSCA_CPF"], key="busca_status_cpf")
             n_busca = col2.text_input(so["BUSCA_NOME"], key="busca_status_nome")
@@ -94,10 +95,11 @@ def render_associados():
                 if st.button("Confirmar Alteração", use_container_width=True, type="primary"):
                     socio_edit.status = novo_status
                     session.commit() 
-                    clear_cache() # Limpar cache
-                    st.success("Status Atualizado!") 
-                    st.rerun()
-            elif c_busca or n_busca: st.warning(so["MSG_NAO_ENCONTRADO"])
+                    clear_cache()
+                    st.success("Status Atualizado!")
+                    st.rerun() # Necessário para atualizar a tabela 
+            elif c_busca or n_busca: 
+                st.warning(so["MSG_NAO_ENCONTRADO"])
 
         st.subheader(so["LISTA_TITULO"])
         todos = session.query(Associados).all()
