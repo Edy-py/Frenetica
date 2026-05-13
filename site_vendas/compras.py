@@ -3,7 +3,7 @@ from data_manager import clear_cache
 import streamlit as st
 import pandas as pd
 from database import get_session, Estoque, Vendas, Associados
-from utils import format_currency, clean_text, validar_telefone, validar_cpf
+from utils import format_currency, clean_text, validar_telefone, validar_cpf, get_base64_image
 import datetime
 import os
 import strings_config as s
@@ -12,11 +12,13 @@ from strings_config import LOJA as l
 
 def render_venda_sucesso():
     """Exibe instruções de pagamento para venda de balcão com PIX destacado."""
-    # Verificação de segurança para evitar o AttributeError
-    if "ultimo_pedido_balcao" not in st.session_state:
+    if "ultimo_pedido" in st.session_state:
+        pedido = st.session_state.ultimo_pedido
+    elif "ultimo_pedido_balcao" in st.session_state:
+        pedido = st.session_state.ultimo_pedido_balcao
+    else:
         return
 
-    pedido = st.session_state.ultimo_pedido_balcao
     st.balloons()
     
     # CSS para destacar a área do PIX
@@ -25,7 +27,7 @@ def render_venda_sucesso():
             .pix-box {{
                 background-color: #f0f2f6;
                 padding: 20px;
-                border-radius: 10px;
+                border-radius: 15px;
                 border: 2px solid {s.COR_AMARELO_MARCA};
                 text-align: center;
                 margin: 15px 0;
@@ -40,12 +42,13 @@ def render_venda_sucesso():
                 border-radius: 5px;
                 display: block;
                 margin-top: 10px;
+                border: 1px dashed #ccc;
             }}
         </style>
     """, unsafe_allow_html=True)
     
     with st.container(border=True):
-        st.success(f"### 🎉 Venda para {pedido['cliente']} registrada!")
+        st.success(f"### 🎉 Pedido de {pedido['cliente']} registrado!")
         st.write(f"**Valor total:** {format_currency(pedido['total'])}")
         
         if pedido['metodo'] == "Pix":
@@ -55,22 +58,94 @@ def render_venda_sucesso():
                     <span class="pix-key">{s.FINANCEIRO_PIX.replace("## ", "")}</span>
                 </div>
             """, unsafe_allow_html=True)
-            
-            # Botão direto para o WhatsApp do Financeiro
             st.link_button("📲 Enviar Comprovante (WhatsApp Alfredo)", s.LINK_WHATSAPP_FIN, use_container_width=True, type="primary")
         
         elif "Cartão" in pedido['metodo']:
             st.warning(s.MSG_PAGAMENTO_CARTAO.format(valor=format_currency(pedido['total'])))
             st.link_button("💳 Solicitar Link de Pagamento", s.LINK_WHATSAPP_FIN, use_container_width=True, type="primary")
             
-        if st.button("Nova Venda de Balcão", use_container_width=True):
-            del st.session_state.ultimo_pedido_balcao
+        if st.button("Nova Compra / Voltar", use_container_width=True):
+            if "ultimo_pedido" in st.session_state: del st.session_state.ultimo_pedido
+            if "ultimo_pedido_balcao" in st.session_state: del st.session_state.ultimo_pedido_balcao
             st.rerun()
+
 @st.fragment
 def render_loja_dinamica(session):
     """Fragmento que isola a vitrine e o carrinho para evitar recarregamento total."""
     desconto_ativo = st.session_state.get("socio_logado") is not None
     
+    # --- CSS PREMIUM PARA VITRINE ---
+    st.markdown(f"""
+        <style>
+            .card-produto {{
+                background: white;
+                border-radius: 22px;
+                padding: 25px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                border: 1px solid rgba(0,0,0,0.05);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                height: 450px; /* Altura fixa para alinhar a grade */
+                text-align: center;
+                overflow: hidden;
+                margin-bottom: 20px;
+                position: relative;
+            }}
+
+            .card-produto:hover {{
+                transform: translateY(-10px);
+                box-shadow: 0 25px 50px rgba(0,0,0,0.12);
+                border-color: {s.COR_AMARELO_MARCA};
+                height: auto; 
+                min-height: 450px;
+                z-index: 10;
+            }}
+
+            .img-produto {{
+                width: 100%;
+                height: 200px;
+                object-fit: contain;
+                border-radius: 15px;
+                margin-bottom: 15px;
+                background: #f8fafc;
+            }}
+
+            .titulo-produto {{
+                font-size: 1.3rem !important;
+                color: #1e293b !important;
+                font-weight: 800 !important;
+                margin: 10px 0 !important;
+                height: 50px;
+                display: flex;
+                align-items: center;
+            }}
+
+            .preco-produto {{
+                color: {s.COR_AZUL_MARCA};
+                font-size: 1.6rem;
+                font-weight: 800;
+                margin: 5px 0;
+            }}
+
+            .desc-produto {{
+                font-size: 0.95rem;
+                color: #64748b;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                transition: all 0.3s ease;
+            }}
+
+            .card-produto:hover .desc-produto {{
+                -webkit-line-clamp: unset;
+                display: block;
+            }}
+        </style>
+    """, unsafe_allow_html=True)
+
     # --- VITRINE ---
     prods = session.query(Estoque).filter(Estoque.quantidade > 0).all()
     if prods:
@@ -78,19 +153,28 @@ def render_loja_dinamica(session):
         for idx, p in enumerate(prods):
             with cols[idx % 3]:
                 path = f"imagens/produtos/{p.foto_url}"
-                if p.foto_url and os.path.exists(path): 
-                    st.image(path, use_container_width=True)
+                b64 = get_base64_image(path) if p.foto_url and os.path.exists(path) else None
+                img_html = f'<img src="data:image/png;base64,{b64}" class="img-produto">' if b64 else '<div class="img-produto" style="display:flex;align-items:center;justify-content:center;">🖼️ Sem Foto</div>'
                 
                 v_unitario = p.preco_venda_un * (1 - s.DESCONTO_VALOR) if desconto_ativo else p.preco_venda_un
-                st.subheader(p.nome_produto)
-                st.markdown(f"### {format_currency(v_unitario)}")
                 
+                # Render do Card HTML
+                st.markdown(f"""
+                    <div class="card-produto">
+                        {img_html}
+                        <div class="titulo-produto">{p.nome_produto}</div>
+                        <div class="preco-produto">{format_currency(v_unitario)}</div>
+                        <p class="desc-produto">Produto oficial da {s.ATLETICA_NOME}. Alta qualidade para o associado frenético!</p>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # Botão integrado
                 def add_ao_carrinho(prod=p, preco=v_unitario):
                     st.session_state.carrinho_cliente.append({
                         "id_db": prod.id, "nome": prod.nome_produto, "preco": preco,
                         "personalizavel": prod.personalizavel, "personalizacao": ""
                     })
-                    st.toast(f"{prod.nome_produto} adicionado!")
+                    st.toast(f"✅ {prod.nome_produto} adicionado!")
 
                 st.button(f"🛒 Adicionar", key=f"btn_{p.id}", use_container_width=True, on_click=add_ao_carrinho)
 
@@ -155,8 +239,7 @@ def render_loja_dinamica(session):
                                 personalizacao=perso, metodo_pagamento=metodo_sel,
                                 is_associado=desconto_ativo
                             ))
-                            if prod_db: 
-                                prod_db.quantidade -= 1
+                            if prod_db: prod_db.quantidade -= 1
 
                         session.commit()
                         clear_cache()
@@ -182,7 +265,7 @@ def render_compras():
     if 'carrinho_cliente' not in st.session_state:
         st.session_state.carrinho_cliente = []
 
-    st.markdown(f'<h2 style="text-align: center;">{l["TITULO"]}</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 style="text-align: center; color: {s.COR_AZUL_MARCA};">{l["TITULO"]}</h2>', unsafe_allow_html=True)
 
     with st.sidebar:
         st.header(l["HEADER_SOCIO"])
@@ -196,9 +279,7 @@ def render_compras():
                     socio = session.query(Associados).filter_by(codigo_unico=cpf_busca, status="Ativo").first()
                     if socio:
                         st.session_state.socio_logado = {
-                            "nome": socio.nome, 
-                            "cpf": socio.codigo_unico, 
-                            "telefone": socio.telefone
+                            "nome": socio.nome, "cpf": socio.codigo_unico, "telefone": socio.telefone
                         }
                         st.rerun()
                     else:
@@ -220,12 +301,7 @@ def render_compras():
                     sucesso_cpf, cpf_limpo = validar_cpf(c)
                     if sucesso_cpf and sucesso_tel and n:
                         try:
-                            session.add(Associados(
-                                nome=clean_text(n), 
-                                codigo_unico=cpf_limpo, 
-                                telefone=tel_limpo, 
-                                status="Inativo"
-                            ))
+                            session.add(Associados(nome=clean_text(n), codigo_unico=cpf_limpo, telefone=tel_limpo, status="Inativo"))
                             session.commit()
                             clear_cache()
                             st.success("Solicitação enviada!")
