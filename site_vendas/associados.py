@@ -3,9 +3,7 @@ import streamlit as st
 import pandas as pd
 import os
 from database import get_session, Associados, Parceiros
-from utils import clean_text, get_base64_image, format_telefone, validar_cpf, validar_telefone
-import strings_config as s 
-from data_manager import clear_cache
+from utils import clean_text, get_base64_image, format_telefone, validar_cpf, validar_telefone, salvar_imagem
 import strings_config as s 
 from data_manager import clear_cache
 
@@ -41,7 +39,7 @@ def render_associados():
         tab1, tab2 = st.tabs([so["TAB_GERENCIAR_SOCIOS"], so["TAB_GERENCIAR_PARCEIROS"]])
         
         with tab1:
-            # Uso de clear_on_submit evita a necessidade de rerun para limpar campos
+            # Gerenciamento de Sócios (Mantido original)
             with st.expander(so["EXPANDER_CADASTRO"], expanded=False):
                 with st.form("form_cad_socio", clear_on_submit=True):
                     c1, c2, c3 = st.columns(3)
@@ -67,7 +65,8 @@ def render_associados():
                                 st.error(so["MSG_EXISTE"])
 
         with tab2:
-            with st.expander("Cadastrar novos parceiros", expanded=False):
+            # --- CADASTRO DE PARCEIROS ---
+            with st.expander("➕ Cadastrar Novos Parceiros", expanded=False):
                 with st.form("form_cad_parceiro", clear_on_submit=True):
                     nome_p = st.text_input("Nome da empresa")
                     vantagem_p = st.text_area("Vantagens oferecidas")
@@ -76,21 +75,61 @@ def render_associados():
                     if st.form_submit_button("Publicar Parceria", type="primary", use_container_width=True):
                         if nome_p and vantagem_p:
                             try:
-                                from utils import salvar_imagem
                                 nome_logo = salvar_imagem(logo_arq, "parceiros") if logo_arq else None
                                 session.add(Parceiros(nome=nome_p.upper().strip(), vantagem=vantagem_p, logo_url=nome_logo))
                                 session.commit() 
                                 clear_cache()
                                 st.success(s.MSG_SUCESSO_PARCERIA)
+                                st.rerun()
                             except:
                                 session.rollback()
                                 st.error("Erro ao salvar parceiro.")
+
+            # --- EDIÇÃO E EXCLUSÃO DE PARCEIROS ---
+            st.divider()
+            st.subheader("⚙️ Gerenciar Parceiros Existentes")
+            parceiros_lista = session.query(Parceiros).all()
+            
+            if parceiros_lista:
+                for p in parceiros_lista:
+                    with st.expander(f"🏢 {p.nome}"):
+                        with st.form(key=f"form_edit_parceiro_{p.id}"):
+                            edit_nome = st.text_input("Nome da Empresa", value=p.nome)
+                            edit_vantagem = st.text_area("Vantagens", value=p.vantagem)
+                            edit_logo = st.file_uploader("Trocar Logo (opcional)", type=['png', 'jpg', 'jpeg'])
+                            
+                            col_b1, col_b2 = st.columns(2)
+                            if col_b1.form_submit_button("💾 Salvar Alterações", use_container_width=True):
+                                try:
+                                    p.nome = edit_nome.upper().strip()
+                                    p.vantagem = edit_vantagem
+                                    if edit_logo:
+                                        p.logo_url = salvar_imagem(edit_logo, "parceiros")
+                                    session.commit()
+                                    clear_cache()
+                                    st.success("Alterações salvas!")
+                                    st.rerun()
+                                except:
+                                    session.rollback()
+                                    st.error("Erro ao atualizar parceiro.")
+                            
+                            # Botão de Excluir dentro de um confirmação
+                            if col_b2.form_submit_button("🗑️ Excluir Parceiro", use_container_width=True):
+                                try:
+                                    session.delete(p)
+                                    session.commit()
+                                    clear_cache()
+                                    st.warning("Parceiro removido!")
+                                    st.rerun()
+                                except:
+                                    session.rollback()
+            else:
+                st.info("Nenhum parceiro cadastrado para gerenciar.")
 
     # --- CONTROLE DE STATUS (FINANCEIRO / ADMIN) ---
     if role in ["admin", "financeiro"]:
         st.divider()
         with st.expander(so["EXPANDER_STATUS"], expanded=False):
-    
             col1, col2 = st.columns(2)
             c_busca = col1.text_input(so["BUSCA_CPF"], key="busca_status_cpf")
             n_busca = col2.text_input(so["BUSCA_NOME"], key="busca_status_nome")
@@ -111,7 +150,7 @@ def render_associados():
                     session.commit() 
                     clear_cache()
                     st.success("Status Atualizado!")
-                    st.rerun() # Necessário para atualizar a tabela 
+                    st.rerun()
             elif c_busca or n_busca: 
                 st.warning(so["MSG_NAO_ENCONTRADO"])
 
@@ -121,13 +160,13 @@ def render_associados():
             df_as = pd.DataFrame([{"Nome": socio.nome, "CPF": socio.codigo_unico, "Status": socio.status, "Telefone": format_telefone(socio.telefone)} for socio in todos])
             st.dataframe(df_as, use_container_width=True, hide_index=True)
 
-    # --- VISUALIZAÇÃO DE CARDS ---
+    # --- VISUALIZAÇÃO DE CARDS (VISÍVEL PARA TODOS) ---
     st.divider()
     st.subheader(f"Benefícios {s.ATLETICA_NOME}")
-    lista_parceiros = session.query(Parceiros).all()
-    if lista_parceiros:
+    lista_parceiros_view = session.query(Parceiros).all()
+    if lista_parceiros_view:
         cols = st.columns(3)
-        for idx, p in enumerate(lista_parceiros):
+        for idx, p in enumerate(lista_parceiros_view):
             with cols[idx % 3]:
                 caminho = os.path.join("imagens", "parceiros", p.logo_url) if p.logo_url else ""
                 b64 = get_base64_image(caminho)

@@ -13,7 +13,7 @@ from associados import render_associados
 from compras import render_compras
 import strings_config as s 
 
-# 1. Configuração da Página - Mantida original
+# 1. Configuração da Página
 st.set_page_config(
     page_title=s.TITULO_PAGINA,
     page_icon="icons/icone_aba.png",
@@ -23,7 +23,7 @@ st.set_page_config(
 # Inicialização única do Banco
 init_db()
 
-# Cache de imagem Base64
+# Cache de imagem Base64 para performance
 @st.cache_data(ttl=3600)
 def get_base64(bin_file):
     if bin_file and os.path.exists(bin_file):
@@ -62,20 +62,11 @@ st.markdown(f"""
             overflow: hidden;
         }}
         
-        .banner-wrapper::after {{
-            content: "";
-            position: absolute;
-            top: -50%; left: -50%;
-            width: 200%; height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
-            pointer-events: none;
-        }}
-
         .banner-wrapper h1 {{
             color: white !important;
             font-weight: 800 !important;
             letter-spacing: -1px;
-            font-size: 3.5rem !important;
+            font-size: 3.2rem !important;
             margin-top: 15px !important;
             text-shadow: 0 4px 10px rgba(0,0,0,0.2);
         }}
@@ -91,7 +82,6 @@ st.markdown(f"""
 
         .stTabs [data-baseweb="tab"] {{
             height: 50px;
-            white-space: pre;
             background-color: transparent;
             border-radius: 10px;
             color: #444;
@@ -103,35 +93,18 @@ st.markdown(f"""
         .stTabs [aria-selected="true"] {{
             background-color: var(--primary) !important;
             color: white !important;
-            transform: scale(1.02);
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }}
 
         /* Botões Estilo Premium */
         div.stButton > button {{
             border-radius: 12px !important;
-            background-color: white;
-            color: var(--primary);
-            border: 2px solid var(--primary) !important;
             font-weight: 600 !important;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            transition: all 0.3s ease !important;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
         }}
 
-        div.stButton > button:hover {{
-            background-color: var(--primary) !important;
-            color: white !important;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
-        }}
-
-        /* Inputs e Formulários */
-        .stTextInput input, .stSelectbox [data-baseweb="select"] {{
-            border-radius: 10px !important;
-            border: 1px solid #e0e0e0 !important;
-        }}
-
-        /* Ajuste de métricas no Dashboard */
+        /* Métricas */
         [data-testid="stMetric"] {{
             background-color: white;
             padding: 20px;
@@ -140,7 +113,7 @@ st.markdown(f"""
             border-left: 5px solid var(--primary);
         }}
 
-        /* Cards de Parceiros (Se houver) */
+        /* --- CARDS DE PARCEIROS COM TAMANHO FIXO --- */
         .card-parceiro {{
             background: white;
             border-radius: 20px;
@@ -148,34 +121,70 @@ st.markdown(f"""
             box-shadow: 0 10px 20px rgba(0,0,0,0.05);
             transition: all 0.3s ease;
             border: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 380px; /* Altura fixa para alinhamento */
+            text-align: center;
+            overflow: hidden;
+            margin-bottom: 20px;
         }}
+
         .card-parceiro:hover {{
             transform: translateY(-8px);
             box-shadow: 0 15px 30px rgba(0,0,0,0.1);
             border-color: var(--secondary);
         }}
+
+        .card-img {{
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--primary);
+            margin-bottom: 15px;
+            background: white;
+        }}
+
+        .card-title {{
+            font-size: 1.4rem !important;
+            color: var(--primary) !important;
+            margin: 10px 0 !important;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            font-weight: 700;
+        }}
+
+        .card-text {{
+            font-size: 0.95rem;
+            color: #555;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 4; /* Corta o texto em 4 linhas */
+            -webkit-box-orient: vertical;
+        }}
     </style>
 """, unsafe_allow_html=True)
 
 if login():
-    # Sidebar - Botão de Logout fixo no topo da barra lateral
+    # Sidebar - Identidade do usuário
     with st.sidebar:
-        st.write(f"Conectado como: **{st.session_state.role.upper()}**")
+        st.markdown(f"### 👤 {st.session_state.role.upper()}")
         logout()
     
-    # Renderização do Banner Premium
+    # Renderização do Banner Principal
     logo_b64 = get_base64(s.BANNER_ARQUIVO)
     banner_html = f'<div class="banner-wrapper">'
     if logo_b64:
-        banner_html += f'<img src="data:image/png;base64,{logo_b64}" width="160" style="filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));">'
+        banner_html += f'<img src="data:image/png;base64,{logo_b64}" width="150" style="filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));">'
     banner_html += f'<h1>{s.TEXTO_BANNER}</h1></div>'
     st.markdown(banner_html, unsafe_allow_html=True)
     
-    # Navegação Restrita
+    # Lógica de Navegação e Permissões
     role = st.session_state.role
     n = s.NOMES_ABAS
     
-    # Mapeamento de menus mantido original
     menu_map = {
         "admin": [n["dashboard"], n["estoque"], n["vendas"], n["associados"], n["compras"]],
         "financeiro": [n["dashboard"], n["vendas"], n["associados"]],
@@ -184,28 +193,25 @@ if login():
     }
     
     menu = menu_map.get(role, [n["loja"]])
-    
-    # Otimização: Tabs não causam rerun total do script ao trocar, 
-    # mas o conteúdo dentro delas sim. O uso de fragmentos nos arquivos 
-    # externos (estoque.py, etc) complementa esta otimização.
     tabs = st.tabs(menu)
 
     for i, nome_aba in enumerate(menu):
         with tabs[i]:
-            # Encapsulamento de conteúdo em um container para respiro
-            container = st.container()
-            with container:
-                if nome_aba == n["dashboard"]:
-                    render_dashboard() if role in ["admin", "financeiro"] else st.error("Acesso negado.")
-                
-                elif n["estoque"] in nome_aba: 
-                    render_estoque(readonly=(role != "admin"))
-                
-                elif n["vendas"] in nome_aba: 
-                    render_vendas(can_edit_status=(role in ["admin", "financeiro"]))
-                
-                elif n["associados"] in nome_aba or n.get("parceiros") in nome_aba: 
-                    render_associados()
-                
-                elif n["loja"] in nome_aba or n.get("compras") in nome_aba: 
-                    render_compras()
+            st.markdown("<br>", unsafe_allow_html=True) # Espaçamento entre menu e conteúdo
+            if nome_aba == n["dashboard"]:
+                if role in ["admin", "financeiro"]:
+                    render_dashboard()
+                else:
+                    st.error("Acesso restrito.")
+            
+            elif n["estoque"] in nome_aba: 
+                render_estoque(readonly=(role != "admin"))
+            
+            elif n["vendas"] in nome_aba: 
+                render_vendas(can_edit_status=(role in ["admin", "financeiro"]))
+            
+            elif n["associados"] in nome_aba or n.get("parceiros") in nome_aba: 
+                render_associados()
+            
+            elif n["loja"] in nome_aba or n.get("compras") in nome_aba: 
+                render_compras()
