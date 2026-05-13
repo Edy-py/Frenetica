@@ -195,3 +195,5 @@ LABEL_TEL_CLIENTE_VENDA = "WhatsApp (DDD + Número)"
 MSG_SUCESSO_PARCERIA = "Parceria adicionada com sucesso"
 
 MSG_ERRO_SOCIO_NAO_ENCONTRADO = "CPF não encontrado!"
+
+LOGO_ARQUIVO = "midia/LOGOFNC.png"

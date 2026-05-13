@@ -19,7 +19,6 @@ def render_estoque(readonly=True):
     # --- LÓGICA 1: VISUALIZAR / CADASTRAR NOVO PRODUTO ---
     if tipo_operacao == es["OPERACAO_OPCOES"][0] and not readonly:
         with st.expander(es["CAD_PROD_EXPANDER"], expanded=False):
-            # clear_on_submit limpa os campos automaticamente sem precisar de rerun
             with st.form("form_cadastro_prod", clear_on_submit=True):
                 nome = st.text_input(es["LABEL_NOME"], placeholder=s.PLACEHOLDER_PRODUTO)
                 c1, c2, c3 = st.columns(3)
@@ -47,7 +46,6 @@ def render_estoque(readonly=True):
                                 session.commit()
                                 clear_cache()
                                 st.success(f"Sucesso: {nome_up} cadastrado!")
-                                # Rerun aqui é opcional; o form já limpa os dados.
                             except Exception as e:
                                 session.rollback()
                                 st.error(f"Erro: {e}")
@@ -80,7 +78,6 @@ def render_estoque(readonly=True):
                             if edit_foto: 
                                 item.foto_url = salvar_imagem(edit_foto, "produtos")
                             session.commit()
-                            clear_cache()
                             st.success(es["MSG_EDIT_SUCESSO"])
                             st.rerun() # Necessário para atualizar a tabela visual abaixo
                         except Exception as e:
@@ -95,9 +92,11 @@ def render_estoque(readonly=True):
         with st.form("form_cad_kit", clear_on_submit=True):
             nome_kit = st.text_input(es["LABEL_NOME_KIT"], placeholder=es["PLACEHOLDER_KIT"])
             
-            prods_all = session.query(Estoque).all()
-            opcoes_dict = {p.nome_produto: p for p in prods_all}
-            selecionados = st.multiselect(es["LABEL_PRODS_KIT"], options=list(opcoes_dict.keys()))
+            # Busca produtos para o multiselect
+            produtos_disponiveis = session.query(Estoque).all()
+            opcoes_dict = {p.nome_produto: p for p in produtos_disponiveis}
+            
+            selecionados = st.multiselect("Selecione os produtos", options=list(opcoes_dict.keys()))
             
             val_kit = st.number_input(es["LABEL_VALOR_KIT"], min_value=0.0, format="%.2f")
             foto_kit = st.file_uploader("Imagem do Kit", type=['png', 'jpg', 'jpeg'])
@@ -106,41 +105,39 @@ def render_estoque(readonly=True):
                 nome_k_up = clean_text(nome_kit)
                 if nome_k_up and selecionados:
                     custo_total = sum(opcoes_dict[it].preco_custo for it in selecionados)
-                    try:
-                        novo_kit = Estoque(
-                            nome_produto=f"[KIT] {nome_k_up}", quantidade=999,
-                            preco_custo=custo_total, preco_venda_un=val_kit,
-                            personalizavel=any(opcoes_dict[it].personalizavel for it in selecionados),
-                            foto_url=salvar_imagem(foto_kit, "produtos") if foto_kit else None
-                        )
-                        session.add(novo_kit)
-                        session.commit()
-                        clear_cache()
-                        st.success(es["MSG_KIT_SUCESSO"].format(nome=nome_k_up))
-                        # st.rerun() # Removido: o form limpa e a tabela atualizará no próximo ciclo
-                    except Exception as e:
-                        session.rollback()
-                        st.error(f"Erro ao criar kit: {e}")
-                else: 
+                    nome_img_k = salvar_imagem(foto_kit, "produtos")
+                    
+                    novo_kit = Estoque(
+                        nome_produto=f"[KIT] {nome_k_up}",
+                        quantidade=999, # Kits dependem dos itens individuais
+                        preco_custo=custo_total,
+                        preco_venda_un=val_kit,
+                        personalizavel=any(opcoes_dict[it].personalizavel for it in selecionados),
+                        foto_url=nome_img_k
+                    )
+                    session.add(novo_kit)
+                    session.commit()
+                    st.success(es["MSG_KIT_SUCESSO"].format(nome=nome_k_up))
+                    st.rerun()
+                else:
                     st.error(es["MSG_ERRO_ITENS_KIT"])
 
     st.divider()
 
     # --- TABELA DE VISUALIZAÇÃO ---
     st.subheader(es["SUB_ESTOQUE_DISPONIVEL"])
+    dados = session.query(Estoque).order_by(Estoque.id.desc()).all()
     
-    df_raw = get_estoque_df()
-    
-    if not df_raw.empty:
-        df_vis = pd.DataFrame([{
-            es["COLUNAS"][0]: row['id'],
-            es["COLUNAS"][1]: row['nome_produto'],
-            es["COLUNAS"][2]: row['quantidade'],
-            es["COLUNAS"][3]: format_currency(row['preco_venda_un']),
-            es["COLUNAS"][4]: "✅" if row['personalizavel'] else "❌"
-        } for _, row in df_raw.iterrows()])
-        
-        st.dataframe(df_vis, use_container_width=True, hide_index=True)
+    if dados:
+        # Usa os nomes das colunas definidos no dicionário ESTOQUE
+        df = pd.DataFrame([{
+            es["COLUNAS"][0]: i.id,
+            es["COLUNAS"][1]: i.nome_produto,
+            es["COLUNAS"][2]: i.quantidade,
+            es["COLUNAS"][3]: format_currency(i.preco_venda_un),
+            es["COLUNAS"][4]: "✅" if i.personalizavel else "❌"
+        } for i in dados])
+        st.dataframe(df, use_container_width=True, hide_index=True)
     else:
         st.info(s.MSG_ESTOQUE_VAZIO)
     

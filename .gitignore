@@ -6,5 +6,5 @@ anunciar_eventos/contatos_ufcat.xlsx
 dados_reais/
 __pycache__/
 anunciar_eventos/
+/venv/
 site_vendas/.streamlit/secrets.toml
-site_vendas/*.db

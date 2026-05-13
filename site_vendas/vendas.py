@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from data_manager import clear_cache
+from data_manager import clear_cache
 import streamlit as st
 import pandas as pd
 from database import get_session, Estoque, Vendas, Associados

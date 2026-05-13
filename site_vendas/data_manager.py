@@ -12,7 +12,7 @@ def get_vendas_df():
         if not vendas:
             return pd.DataFrame()
         
-        # Mantendo os nomes das colunas e variáveis originais
+        
         df = pd.DataFrame([{
             "id": v.id,
             "nome_prod": v.nome_prod,

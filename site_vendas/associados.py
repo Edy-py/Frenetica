@@ -6,6 +6,8 @@ from database import get_session, Associados, Parceiros
 from utils import clean_text, get_base64_image, format_telefone, validar_cpf, validar_telefone
 import strings_config as s 
 from data_manager import clear_cache
+import strings_config as s 
+from data_manager import clear_cache
 
 so = s.SOCIOS 
 
@@ -60,7 +62,6 @@ def render_associados():
                                 session.commit()
                                 clear_cache()
                                 st.success(so["MSG_SUCESSO"])
-                                # O rerun aqui é opcional, o form já limpa os dados.
                             except:
                                 session.rollback()
                                 st.error(so["MSG_EXISTE"])
@@ -89,8 +90,7 @@ def render_associados():
     if role in ["admin", "financeiro"]:
         st.divider()
         with st.expander(so["EXPANDER_STATUS"], expanded=False):
-            # Removido st.rerun() daqui; a mudança de estado via selectbox 
-            # pode ser gerida por um botão de confirmação único.
+    
             col1, col2 = st.columns(2)
             c_busca = col1.text_input(so["BUSCA_CPF"], key="busca_status_cpf")
             n_busca = col2.text_input(so["BUSCA_NOME"], key="busca_status_nome")
@@ -111,7 +111,7 @@ def render_associados():
                     session.commit() 
                     clear_cache()
                     st.success("Status Atualizado!")
-                    st.rerun() # Necessário para atualizar a tabela abaixo imediatamente
+                    st.rerun() # Necessário para atualizar a tabela 
             elif c_busca or n_busca: 
                 st.warning(so["MSG_NAO_ENCONTRADO"])
 

@@ -49,7 +49,7 @@ class Parceiros(Base):
     id = Column(Integer, primary_key=True)
     nome = Column(String, unique=True)
     vantagem = Column(String)
-    logo_url = Column(String, nullable=True) # Nome do arquivo na pasta imagens/parceiros
+    logo_url = Column(String, nullable=True) 
 
 # --- CONFIGURAÇÃO DA CONEXÃO VIA SECRETS ---
 
@@ -63,11 +63,11 @@ def get_engine():
             # Fallback local caso o segredo não seja encontrado
             return create_engine('sqlite:///frenetica_local.db')
 
-        # Ajuste para garantir compatibilidade com o dialeto do SQLAlchemy
+        
         if db_url.startswith("postgres://"):
             db_url = db_url.replace("postgres://", "postgresql://", 1)
         
-        # Configurações de Pool (Crucial para o Supabase e Streamlit Cloud)
+        # Configurações de Pool 
         return create_engine(
             db_url, 
             pool_pre_ping=True,
@@ -81,7 +81,7 @@ def get_engine():
 
 engine = get_engine()
 
-# --- AJUSTE AQUI: Envelopando a criação das tabelas na função que o main.py pede ---
+
 def init_db():
     try:
         Base.metadata.create_all(engine)

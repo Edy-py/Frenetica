@@ -27,7 +27,7 @@ def processar_metricas_dashboard(vendas_df, _estoque_df):
     return total_faturamento, total_lucro, total_itens, ticket_medio, vendas_por_dia
 
 def render_dashboard():
-    # Uso do dicionário correto 'DASH' conforme strings_config.py
+    
     st.header(s.DASH["TITULO"]) 
     session = get_session()
 
@@ -75,7 +75,7 @@ def render_dashboard():
     g1, g2 = st.columns(2)
 
     with g1:
-        st.subheader(s.DASH["GRAFICO_ESTOQUE"]) # Reutilizando chaves do strings_config
+        st.subheader(s.DASH["GRAFICO_ESTOQUE"]) 
         if not vendas_por_dia.empty:
             fig_vendas = px.line(vendas_por_dia, x='Data', y='preco_venda_total', 
                                  title="Faturamento Diário", markers=True)
@@ -106,4 +106,4 @@ def render_dashboard():
             axis=1, subset=['Quantidade']
         ), use_container_width=True, hide_index=True)
 
-    session.close()
+    
