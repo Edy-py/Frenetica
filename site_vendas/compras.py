@@ -1,15 +1,71 @@
 # -*- coding: utf-8 -*-
+from data_manager import clear_cache
 import streamlit as st
-import os
-from database import get_session, Estoque, Vendas, Associados
-from utils import format_currency, clean_text, validar_cpf, validar_telefone, format_telefone
-import strings_config as s
-from strings_config import LOJA as l 
-from strings_config import VENDAS as v 
 import pandas as pd
+from database import get_session, Estoque, Vendas, Associados
+from utils import format_currency, clean_text, validar_telefone, validar_cpf
 import datetime
-from data_manager import clear_cache 
+import os
+import strings_config as s
+from strings_config import VENDAS as v 
+from strings_config import LOJA as l
 
+def render_venda_sucesso():
+    """Exibe instruções de pagamento para venda de balcão com PIX destacado."""
+    # Verificação de segurança para evitar o AttributeError
+    if "ultimo_pedido_balcao" not in st.session_state:
+        return
+
+    pedido = st.session_state.ultimo_pedido_balcao
+    st.balloons()
+    
+    # CSS para destacar a área do PIX
+    st.markdown(f"""
+        <style>
+            .pix-box {{
+                background-color: #f0f2f6;
+                padding: 20px;
+                border-radius: 10px;
+                border: 2px solid {s.COR_AMARELO_MARCA};
+                text-align: center;
+                margin: 15px 0;
+            }}
+            .pix-key {{
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 1.5rem;
+                font-weight: bold;
+                color: {s.COR_AZUL_MARCA};
+                background: white;
+                padding: 10px;
+                border-radius: 5px;
+                display: block;
+                margin-top: 10px;
+            }}
+        </style>
+    """, unsafe_allow_html=True)
+    
+    with st.container(border=True):
+        st.success(f"### 🎉 Venda para {pedido['cliente']} registrada!")
+        st.write(f"**Valor total:** {format_currency(pedido['total'])}")
+        
+        if pedido['metodo'] == "Pix":
+            st.markdown(f"""
+                <div class="pix-box">
+                    <strong>⚡ CHAVE PIX PARA PAGAMENTO</strong>
+                    <span class="pix-key">{s.FINANCEIRO_PIX.replace("## ", "")}</span>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Botão direto para o WhatsApp do Financeiro
+            st.link_button("📲 Enviar Comprovante (WhatsApp Alfredo)", s.LINK_WHATSAPP_FIN, use_container_width=True, type="primary")
+        
+        elif "Cartão" in pedido['metodo']:
+            st.warning(s.MSG_PAGAMENTO_CARTAO.format(valor=format_currency(pedido['total'])))
+            st.link_button("💳 Solicitar Link de Pagamento", s.LINK_WHATSAPP_FIN, use_container_width=True, type="primary")
+            
+        if st.button("Nova Venda de Balcão", use_container_width=True):
+            del st.session_state.ultimo_pedido_balcao
+            st.rerun()
 @st.fragment
 def render_loja_dinamica(session):
     """Fragmento que isola a vitrine e o carrinho para evitar recarregamento total."""
@@ -51,11 +107,11 @@ def render_loja_dinamica(session):
         total_final = df_cart['preco'].sum()
         st.markdown(f"### Total: :green[{format_currency(total_final)}]")
 
-        # Formulário para Finalização
         with st.form("form_finalizar_compra"):
+            st.markdown("### 💳 Detalhes do Pedido")
             c1, c2 = st.columns(2)
-            metodo_sel = c1.selectbox(v["LABEL_PAGAMENTO"], v["OPCOES_PAGAMENTO"])
-            tamanho_sel = c2.selectbox(v["LABEL_TAMANHO"], v["OPCOES_TAMANHO"])
+            metodo_sel = c1.selectbox(v["LABEL_PAGAMENTO"], v["OPCOES_PAGAMENTO"], key="compra_metodo_pag")
+            tamanho_sel = c2.selectbox(v["LABEL_TAMANHO"], v["OPCOES_TAMANHO"], key="compra_tamanho")
             
             socio_info = st.session_state.get("socio_logado")
             
@@ -70,10 +126,8 @@ def render_loja_dinamica(session):
             if any(item['personalizavel'] for item in st.session_state.carrinho_cliente):
                 perso = st.text_input("Personalização", placeholder="Nome - Número")
 
-            # Colunas para os botões de ação dentro do formulário
             btn_col1, btn_col2 = st.columns(2)
-            
-            finalizar = btn_col1.form_submit_button("✅ Finalizar Pedido", use_container_width=True, type="primary")
+            finalizar = btn_col1.form_submit_button("✅ Finalizar e Pagar", use_container_width=True, type="primary")
             limpar = btn_col2.form_submit_button("🗑️ Limpar Carrinho", use_container_width=True)
 
             if finalizar:
@@ -82,13 +136,13 @@ def render_loja_dinamica(session):
                 else:
                     try:
                         nome_final = clean_text(nome_cli_input)
+                        tel_final = tel_cli_input
+                        
                         if not socio_info:
                             sucesso_tel, tel_final = validar_telefone(tel_cli_input)
                             if not sucesso_tel:
                                 st.error(s.MSG_ERRO_TELEFONE)
                                 st.stop()
-                        else:
-                            tel_final = tel_cli_input
 
                         for item in st.session_state.carrinho_cliente:
                             prod_db = session.query(Estoque).filter_by(id=item['id_db']).first()
@@ -105,11 +159,14 @@ def render_loja_dinamica(session):
                                 prod_db.quantidade -= 1
 
                         session.commit()
-                        st.balloons()
                         clear_cache()
+                        
+                        st.session_state.ultimo_pedido = {
+                            "total": total_final,
+                            "metodo": metodo_sel,
+                            "cliente": nome_final
+                        }
                         st.session_state.carrinho_cliente = []
-                        if metodo_sel == "Pix":
-                            st.info(s.MSG_PAGAMENTO_PIX)
                         st.rerun()
                     except Exception as e:
                         session.rollback()
@@ -176,5 +233,9 @@ def render_compras():
                             session.rollback()
                             st.error("CPF já cadastrado.")
 
-    render_loja_dinamica(session)
+    if "ultimo_pedido" in st.session_state:
+        render_venda_sucesso()
+    else:
+        render_loja_dinamica(session)
+        
     session.close()

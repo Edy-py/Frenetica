@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from data_manager import clear_cache
-from data_manager import clear_cache
 import streamlit as st
 import pandas as pd
 from database import get_session, Estoque, Vendas, Associados
@@ -9,9 +8,66 @@ import datetime
 import strings_config as s
 from strings_config import VENDAS as v 
 
+def render_venda_sucesso():
+    """Exibe instruções de pagamento para venda de balcão com PIX destacado."""
+    # Verificação de segurança para evitar o AttributeError
+    if "ultimo_pedido_balcao" not in st.session_state:
+        return
+
+    pedido = st.session_state.ultimo_pedido_balcao
+    st.balloons()
+    
+    # CSS para destacar a área do PIX
+    st.markdown(f"""
+        <style>
+            .pix-box {{
+                background-color: #f0f2f6;
+                padding: 20px;
+                border-radius: 10px;
+                border: 2px solid {s.COR_AMARELO_MARCA};
+                text-align: center;
+                margin: 15px 0;
+            }}
+            .pix-key {{
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 1.5rem;
+                font-weight: bold;
+                color: {s.COR_AZUL_MARCA};
+                background: white;
+                padding: 10px;
+                border-radius: 5px;
+                display: block;
+                margin-top: 10px;
+            }}
+        </style>
+    """, unsafe_allow_html=True)
+    
+    with st.container(border=True):
+        st.success(f"### 🎉 Venda para {pedido['cliente']} registrada!")
+        st.write(f"**Valor total:** {format_currency(pedido['total'])}")
+        
+        if pedido['metodo'] == "Pix":
+            st.markdown(f"""
+                <div class="pix-box">
+                    <strong>⚡ CHAVE PIX PARA PAGAMENTO</strong>
+                    <span class="pix-key">{s.FINANCEIRO_PIX.replace("## ", "")}</span>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Botão direto para o WhatsApp do Financeiro
+            st.link_button("📲 Enviar Comprovante (WhatsApp Alfredo)", s.LINK_WHATSAPP_FIN, use_container_width=True, type="primary")
+        
+        elif "Cartão" in pedido['metodo']:
+            st.warning(s.MSG_PAGAMENTO_CARTAO.format(valor=format_currency(pedido['total'])))
+            st.link_button("💳 Solicitar Link de Pagamento", s.LINK_WHATSAPP_FIN, use_container_width=True, type="primary")
+            
+        if st.button("Nova Venda de Balcão", use_container_width=True):
+            del st.session_state.ultimo_pedido_balcao
+            st.rerun()
+
 @st.fragment
 def render_carrinho_venda(session, metodo_pagamento_opcoes):
-    """Fragmento isolado para gerir o carrinho de balcão sem recarregar a página toda."""
+    """Fragmento isolado para gerir o carrinho de balcão."""
     if st.session_state.carrinho:
         st.subheader("🛒 Carrinho")
         df_cart = pd.DataFrame(st.session_state.carrinho)
@@ -46,25 +102,26 @@ def render_carrinho_venda(session, metodo_pagamento_opcoes):
                     prod_db = session.query(Estoque).filter_by(nome_produto=item['produto']).first()
                     custo_un = float(prod_db.preco_custo or 0)
                     v_venda_item = float(item['subtotal'] - desc_por_item)
-                    lucro_calc = v_venda_item - (custo_un * item['qtd'])
                     
                     session.add(Vendas(
                         nome_prod=item['produto'], qtd_vendida=item['qtd'],
                         preco_venda_total=v_venda_item, data=datetime.datetime.now(), 
-                        lucro=lucro_calc, nome_cliente=item['cliente'], 
-                        telefone=item['telefone'], tamanho=item['tamanho'], 
-                        personalizacao=item['personalizacao'], metodo_pagamento=metodo_sel,
-                        is_associado=(desconto > 0)
+                        lucro=v_venda_item - (custo_un * item['qtd']), 
+                        nome_cliente=item['cliente'], telefone=item['telefone'], 
+                        tamanho=item['tamanho'], personalizacao=item['personalizacao'], 
+                        metodo_pagamento=metodo_sel, is_associado=(desconto > 0)
                     ))
                     if prod_db: 
                         prod_db.quantidade -= item['qtd']
                 
                 session.commit()
                 clear_cache()
-                st.success(v["MSG_SUCESSO"])
-                if metodo_sel == "Pix": 
-                    st.info(s.MSG_PAGAMENTO_PIX)
                 
+                st.session_state.ultimo_pedido_balcao = {
+                    "total": valor_final_venda,
+                    "metodo": metodo_sel,
+                    "cliente": st.session_state.carrinho[0]['cliente']
+                }
                 st.session_state.carrinho = []
                 st.rerun() 
             except Exception as e:
@@ -78,6 +135,11 @@ def render_carrinho_venda(session, metodo_pagamento_opcoes):
 
 def render_vendas(can_edit_status=False):
     st.header(v["TITULO"])
+    
+    if "ultimo_pedido_balcao" in st.session_state:
+        render_venda_sucesso()
+        return
+
     session = get_session()
 
     if 'carrinho' not in st.session_state:

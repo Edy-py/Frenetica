@@ -16,7 +16,7 @@ BANNER_ARQUIVO = "midia/LOGOFNC.png"
 # --- FINANCEIRO ---
 FINANCEIRO_RESPONSAVEL = "Alfredo"
 FINANCEIRO_WHATSAPP = "6499485869"
-FINANCEIRO_PIX = "## freneticaufcat@gmail.com"
+FINANCEIRO_PIX = "freneticaufcat@gmail.com"
 LINK_WHATSAPP_FIN = f"https://wa.me/55{FINANCEIRO_WHATSAPP}?text=Olá! Segue o comprovante da compra na {ATLETICA_NOME}: "
 
 # ==============================================================================
