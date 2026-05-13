@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 from database import get_session, Estoque
 from utils import clean_text, format_currency, salvar_imagem
-from data_manager import get_estoque_df, clear_cache  # Importando o novo gestor
+from data_manager import get_estoque_df, clear_cache
 import strings_config as s
 from strings_config import ESTOQUE as es
 
@@ -44,7 +44,7 @@ def render_estoque(readonly=True):
                                 )
                                 session.add(novo)
                                 session.commit()
-                                clear_cache()  # Limpa o cache para atualizar a tabela
+                                clear_cache()
                                 st.success(f"Sucesso: {nome_up} cadastrado!")
                             except Exception as e:
                                 session.rollback()
@@ -69,16 +69,17 @@ def render_estoque(readonly=True):
                     edit_pv = ce3.number_input(es["LABEL_NOVO_VENDA"], value=item.preco_venda_un)
                     edit_foto = st.file_uploader(es["LABEL_TROCAR_FOTO"], type=['png', 'jpg', 'jpeg'])
 
-                    if st.form_submit_button("Confirmar Alteração", use_container_width=True):
+                    if st.form_submit_button(es["BOTAO_CONFIRMAR"], use_container_width=True):
                         try:
-                            item.nome_produto, item.quantidade = clean_text(edit_nome), edit_qtd
-                            item.preco_custo, item.preco_venda_un = edit_pc, edit_pv
+                            item.nome_produto = clean_text(edit_nome)
+                            item.quantidade = edit_qtd
+                            item.preco_custo = edit_pc
+                            item.preco_venda_un = edit_pv
                             if edit_foto: 
                                 item.foto_url = salvar_imagem(edit_foto, "produtos")
                             session.commit()
-                            clear_cache()  # Limpa o cache após editar
                             st.success(es["MSG_EDIT_SUCESSO"])
-                            st.rerun()
+                            st.rerun() # Necessário para atualizar a tabela visual abaixo
                         except Exception as e:
                             session.rollback()
                             st.error(f"Erro: {e}")
@@ -88,57 +89,55 @@ def render_estoque(readonly=True):
     # --- LÓGICA 3: GERENCIAR KITS ---
     elif tipo_operacao == es["OPERACAO_OPCOES"][2] and not readonly:
         st.subheader(es["CAD_KIT_EXPANDER"])
-        with st.form("form_cad_kit"):
+        with st.form("form_cad_kit", clear_on_submit=True):
             nome_kit = st.text_input(es["LABEL_NOME_KIT"], placeholder=es["PLACEHOLDER_KIT"])
             
-            # Busca direta para o multiselect (dados sensíveis a mudanças rápidas)
-            prods_all = session.query(Estoque).all()
-            opcoes_dict = {p.nome_produto: p for p in prods_all}
+            # Busca produtos para o multiselect
+            produtos_disponiveis = session.query(Estoque).all()
+            opcoes_dict = {p.nome_produto: p for p in produtos_disponiveis}
+            
             selecionados = st.multiselect("Selecione os produtos", options=list(opcoes_dict.keys()))
             
             val_kit = st.number_input(es["LABEL_VALOR_KIT"], min_value=0.0, format="%.2f")
             foto_kit = st.file_uploader("Imagem do Kit", type=['png', 'jpg', 'jpeg'])
 
-            if st.form_submit_button(es["BOTAO_SALVAR_KIT"]):
+            if st.form_submit_button(es["BOTAO_SALVAR_KIT"], use_container_width=True):
                 nome_k_up = clean_text(nome_kit)
                 if nome_k_up and selecionados:
                     custo_total = sum(opcoes_dict[it].preco_custo for it in selecionados)
-                    try:
-                        novo_kit = Estoque(
-                            nome_produto=f"[KIT] {nome_k_up}", quantidade=999,
-                            preco_custo=custo_total, preco_venda_un=val_kit,
-                            personalizavel=any(opcoes_dict[it].personalizavel for it in selecionados),
-                            foto_url=salvar_imagem(foto_kit, "produtos") if foto_kit else None
-                        )
-                        session.add(novo_kit)
-                        session.commit()
-                        clear_cache()  # Limpa o cache após criar kit
-                        st.success(es["MSG_KIT_SUCESSO"].format(nome=nome_k_up))
-                    except Exception as e:
-                        session.rollback()
-                        st.error(f"Erro ao criar kit: {e}")
-                else: 
+                    nome_img_k = salvar_imagem(foto_kit, "produtos")
+                    
+                    novo_kit = Estoque(
+                        nome_produto=f"[KIT] {nome_k_up}",
+                        quantidade=999, # Kits dependem dos itens individuais
+                        preco_custo=custo_total,
+                        preco_venda_un=val_kit,
+                        personalizavel=any(opcoes_dict[it].personalizavel for it in selecionados),
+                        foto_url=nome_img_k
+                    )
+                    session.add(novo_kit)
+                    session.commit()
+                    st.success(es["MSG_KIT_SUCESSO"].format(nome=nome_k_up))
+                    st.rerun()
+                else:
                     st.error(es["MSG_ERRO_ITENS_KIT"])
 
     st.divider()
 
     # --- TABELA DE VISUALIZAÇÃO (OTIMIZADA COM CACHE) ---
     st.subheader(es["SUB_ESTOQUE_DISPONIVEL"])
+    dados = session.query(Estoque).order_by(Estoque.id.desc()).all()
     
-    # Chama o DataFrame do data_manager que usa @st.cache_data
-    df_raw = get_estoque_df()
-    
-    if not df_raw.empty:
-        # Reconstrói a visualização mantendo as chaves de colunas originais do config
-        df_vis = pd.DataFrame([{
-            es["COLUNAS"][0]: row['id'],
-            es["COLUNAS"][1]: row['nome_produto'],
-            es["COLUNAS"][2]: row['quantidade'],
-            es["COLUNAS"][3]: format_currency(row['preco_venda_un']),
-            es["COLUNAS"][4]: "✅" if row['personalizavel'] else "❌"
-        } for _, row in df_raw.iterrows()])
-        
-        st.dataframe(df_vis, use_container_width=True, hide_index=True)
+    if dados:
+        # Usa os nomes das colunas definidos no dicionário ESTOQUE
+        df = pd.DataFrame([{
+            es["COLUNAS"][0]: i.id,
+            es["COLUNAS"][1]: i.nome_produto,
+            es["COLUNAS"][2]: i.quantidade,
+            es["COLUNAS"][3]: format_currency(i.preco_venda_un),
+            es["COLUNAS"][4]: "✅" if i.personalizavel else "❌"
+        } for i in dados])
+        st.dataframe(df, use_container_width=True, hide_index=True)
     else:
         st.info(s.MSG_ESTOQUE_VAZIO)
     

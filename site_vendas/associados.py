@@ -6,31 +6,42 @@ from database import get_session, Associados, Parceiros
 from utils import clean_text, get_base64_image, format_telefone, validar_cpf, validar_telefone
 import strings_config as s 
 from data_manager import clear_cache
+import strings_config as s 
+from data_manager import clear_cache
 
 so = s.SOCIOS 
+
+@st.fragment
+def render_verificacao_cpf(session):
+    """Fragmento para verificar CPF sem recarregar a página toda."""
+    st.subheader("Verificar CPF")
+    cod_verificar = st.text_input("Digite o CPF", key="input_verificar_parceiro")
+    if st.button("Verificar Status", use_container_width=True, type="primary"):
+        _, cpf_limpo = validar_cpf(cod_verificar)
+        socio = session.query(Associados).filter_by(codigo_unico=cpf_limpo).first()
+        if socio:
+            if socio.status == "Ativo": 
+                st.success(f"✅ **{socio.nome}** é Associado ATIVO!")
+            else: 
+                st.warning(f"⚠️ **{socio.nome}** está INATIVO.")
+        else: 
+            st.error(s.MSG_ERRO_SOCIO_NAO_ENCONTRADO)
 
 def render_associados():
     st.header(f"Parceiros da {s.ATLETICA_NOME}") 
     session = get_session()
     role = st.session_state.role
 
-    # --- PERFIL: PARCEIRO (VERIFICAÇÃO RÁPIDA) ---
+    # --- PERFIL: PARCEIRO ---
     if role == "parceiro":
-        st.subheader("Verificar CPF")
-        cod_verificar = st.text_input("Digite o CPF", key="input_verificar_parceiro")
-        if st.button("Verificar Status", use_container_width=True, type="primary", key="btn_verificar_parceiro"):
-            _, cpf_limpo = validar_cpf(cod_verificar)
-            socio = session.query(Associados).filter_by(codigo_unico=cpf_limpo).first()
-            if socio:
-                if socio.status == "Ativo": st.success(f"✅ **{socio.nome}** é Associado ATIVO!")
-                else: st.warning(f"⚠️ **{socio.nome}** está INATIVO.")
-            else: st.error(s.MSG_ERRO_SOCIO_NAO_ENCONTRADO)
+        render_verificacao_cpf(session)
 
-    # --- PERFIL: ADMIN (CADASTRO DINÂMICO) ---
+    # --- PERFIL: ADMIN ---
     if role == "admin":
         tab1, tab2 = st.tabs([so["TAB_GERENCIAR_SOCIOS"], so["TAB_GERENCIAR_PARCEIROS"]])
         
         with tab1:
+            # Uso de clear_on_submit evita a necessidade de rerun para limpar campos
             with st.expander(so["EXPANDER_CADASTRO"], expanded=False):
                 with st.form("form_cad_socio", clear_on_submit=True):
                     c1, c2, c3 = st.columns(3)
@@ -57,22 +68,23 @@ def render_associados():
 
         with tab2:
             with st.expander("Cadastrar novos parceiros", expanded=False):
-                nome_p = st.text_input("Nome da empresa", key="cad_nome_empresa")
-                vantagem_p = st.text_area("Vantagens oferecidas", key="cad_vantagem_empresa")
-                logo_arq = st.file_uploader("Logo da empresa", type=['png', 'jpg', 'jpeg'], key="cad_logo_empresa")
-                
-                if st.button("Publicar Parceria", type="primary", use_container_width=True):
-                    if nome_p and vantagem_p:
-                        try:
-                            from utils import salvar_imagem
-                            nome_logo = salvar_imagem(logo_arq, "parceiros") if logo_arq else None
-                            session.add(Parceiros(nome=nome_p.upper().strip(), vantagem=vantagem_p, logo_url=nome_logo))
-                            session.commit() 
-                            clear_cache() # Limpar cache
-                            st.success(s.MSG_SUCESSO_PARCERIA) 
-                            st.rerun()
-                        except:
-                            session.rollback(); st.error("Erro ao salvar parceiro.")
+                with st.form("form_cad_parceiro", clear_on_submit=True):
+                    nome_p = st.text_input("Nome da empresa")
+                    vantagem_p = st.text_area("Vantagens oferecidas")
+                    logo_arq = st.file_uploader("Logo da empresa", type=['png', 'jpg', 'jpeg'])
+                    
+                    if st.form_submit_button("Publicar Parceria", type="primary", use_container_width=True):
+                        if nome_p and vantagem_p:
+                            try:
+                                from utils import salvar_imagem
+                                nome_logo = salvar_imagem(logo_arq, "parceiros") if logo_arq else None
+                                session.add(Parceiros(nome=nome_p.upper().strip(), vantagem=vantagem_p, logo_url=nome_logo))
+                                session.commit() 
+                                clear_cache()
+                                st.success(s.MSG_SUCESSO_PARCERIA)
+                            except:
+                                session.rollback()
+                                st.error("Erro ao salvar parceiro.")
 
     # --- CONTROLE DE STATUS (FINANCEIRO / ADMIN) ---
     if role in ["admin", "financeiro"]:
@@ -83,6 +95,7 @@ def render_associados():
             c_busca = col1.text_input(so["BUSCA_CPF"], key="busca_status_cpf")
             n_busca = col2.text_input(so["BUSCA_NOME"], key="busca_status_nome")
             
+            socio_edit = None
             if c_busca:
                 _, c_limpo = validar_cpf(c_busca)
                 socio_edit = session.query(Associados).filter_by(codigo_unico=c_limpo).first()
@@ -91,7 +104,8 @@ def render_associados():
             
             if socio_edit:
                 st.info(f"Sócio: **{socio_edit.nome}**")
-                novo_status = st.selectbox("Alterar Status:", ["Ativo", "Inativo"], index=(0 if socio_edit.status == "Ativo" else 1))
+                novo_status = st.selectbox("Alterar Status:", ["Ativo", "Inativo"], 
+                                         index=(0 if socio_edit.status == "Ativo" else 1))
                 if st.button("Confirmar Alteração", use_container_width=True, type="primary"):
                     socio_edit.status = novo_status
                     session.commit() 
@@ -119,6 +133,7 @@ def render_associados():
                 b64 = get_base64_image(caminho)
                 img_tag = f'<img src="data:image/png;base64,{b64}" class="card-img">' if b64 else '<div class="card-icon"></div>'
                 st.markdown(f'<div class="card-parceiro">{img_tag}<h3 class="card-title">{p.nome}</h3><p class="card-text">{p.vantagem}</p></div>', unsafe_allow_html=True)
-    else: st.info("Em breve novas parcerias!")
+    else: 
+        st.info("Em breve novas parcerias!")
 
     session.close()
