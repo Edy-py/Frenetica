@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 from database import get_session, Estoque
 from utils import clean_text, format_currency, salvar_imagem
-from data_manager import get_estoque_df, clear_cache  # Importando o novo gestor
+from data_manager import get_estoque_df, clear_cache
 import strings_config as s
 from strings_config import ESTOQUE as es
 
@@ -19,7 +19,8 @@ def render_estoque(readonly=True):
     # --- LÓGICA 1: VISUALIZAR / CADASTRAR NOVO PRODUTO ---
     if tipo_operacao == es["OPERACAO_OPCOES"][0] and not readonly:
         with st.expander(es["CAD_PROD_EXPANDER"], expanded=False):
-            with st.form("form_cadastro_prod"):
+            # clear_on_submit limpa os campos automaticamente sem precisar de rerun
+            with st.form("form_cadastro_prod", clear_on_submit=True):
                 nome = st.text_input(es["LABEL_NOME"], placeholder=s.PLACEHOLDER_PRODUTO)
                 c1, c2, c3 = st.columns(3)
                 qtd = c1.number_input(es["LABEL_QTD"], min_value=0)
@@ -44,9 +45,9 @@ def render_estoque(readonly=True):
                                 )
                                 session.add(novo)
                                 session.commit()
-                                clear_cache()  # Limpa o cache para atualizar a tabela
+                                clear_cache()
                                 st.success(f"Sucesso: {nome_up} cadastrado!")
-                                st.rerun()
+                                # Rerun aqui é opcional; o form já limpa os dados.
                             except Exception as e:
                                 session.rollback()
                                 st.error(f"Erro: {e}")
@@ -70,16 +71,18 @@ def render_estoque(readonly=True):
                     edit_pv = ce3.number_input(es["LABEL_NOVO_VENDA"], value=item.preco_venda_un)
                     edit_foto = st.file_uploader(es["LABEL_TROCAR_FOTO"], type=['png', 'jpg', 'jpeg'])
 
-                    if st.form_submit_button("Confirmar Alteração", use_container_width=True):
+                    if st.form_submit_button(es["BOTAO_CONFIRMAR"], use_container_width=True):
                         try:
-                            item.nome_produto, item.quantidade = clean_text(edit_nome), edit_qtd
-                            item.preco_custo, item.preco_venda_un = edit_pc, edit_pv
+                            item.nome_produto = clean_text(edit_nome)
+                            item.quantidade = edit_qtd
+                            item.preco_custo = edit_pc
+                            item.preco_venda_un = edit_pv
                             if edit_foto: 
                                 item.foto_url = salvar_imagem(edit_foto, "produtos")
                             session.commit()
-                            clear_cache()  # Limpa o cache após editar
+                            clear_cache()
                             st.success(es["MSG_EDIT_SUCESSO"])
-                            st.rerun()
+                            st.rerun() # Necessário para atualizar a tabela visual abaixo
                         except Exception as e:
                             session.rollback()
                             st.error(f"Erro: {e}")
@@ -89,18 +92,17 @@ def render_estoque(readonly=True):
     # --- LÓGICA 3: GERENCIAR KITS ---
     elif tipo_operacao == es["OPERACAO_OPCOES"][2] and not readonly:
         st.subheader(es["CAD_KIT_EXPANDER"])
-        with st.form("form_cad_kit"):
+        with st.form("form_cad_kit", clear_on_submit=True):
             nome_kit = st.text_input(es["LABEL_NOME_KIT"], placeholder=es["PLACEHOLDER_KIT"])
             
-            # Busca direta para o multiselect (dados sensíveis a mudanças rápidas)
             prods_all = session.query(Estoque).all()
             opcoes_dict = {p.nome_produto: p for p in prods_all}
-            selecionados = st.multiselect("Selecione os produtos", options=list(opcoes_dict.keys()))
+            selecionados = st.multiselect(es["LABEL_PRODS_KIT"], options=list(opcoes_dict.keys()))
             
             val_kit = st.number_input(es["LABEL_VALOR_KIT"], min_value=0.0, format="%.2f")
             foto_kit = st.file_uploader("Imagem do Kit", type=['png', 'jpg', 'jpeg'])
 
-            if st.form_submit_button(es["BOTAO_SALVAR_KIT"]):
+            if st.form_submit_button(es["BOTAO_SALVAR_KIT"], use_container_width=True):
                 nome_k_up = clean_text(nome_kit)
                 if nome_k_up and selecionados:
                     custo_total = sum(opcoes_dict[it].preco_custo for it in selecionados)
@@ -113,9 +115,9 @@ def render_estoque(readonly=True):
                         )
                         session.add(novo_kit)
                         session.commit()
-                        clear_cache()  # Limpa o cache após criar kit
+                        clear_cache()
                         st.success(es["MSG_KIT_SUCESSO"].format(nome=nome_k_up))
-                        st.rerun()
+                        # st.rerun() # Removido: o form limpa e a tabela atualizará no próximo ciclo
                     except Exception as e:
                         session.rollback()
                         st.error(f"Erro ao criar kit: {e}")
@@ -124,14 +126,12 @@ def render_estoque(readonly=True):
 
     st.divider()
 
-    # --- TABELA DE VISUALIZAÇÃO (OTIMIZADA COM CACHE) ---
+    # --- TABELA DE VISUALIZAÇÃO ---
     st.subheader(es["SUB_ESTOQUE_DISPONIVEL"])
     
-    # Chama o DataFrame do data_manager que usa @st.cache_data
     df_raw = get_estoque_df()
     
     if not df_raw.empty:
-        # Reconstrói a visualização mantendo as chaves de colunas originais do config
         df_vis = pd.DataFrame([{
             es["COLUNAS"][0]: row['id'],
             es["COLUNAS"][1]: row['nome_produto'],

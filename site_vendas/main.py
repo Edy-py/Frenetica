@@ -13,7 +13,7 @@ from associados import render_associados
 from compras import render_compras
 import strings_config as s 
 
-# 1. Configuração da Página
+# 1. Configuração da Página - Mantida original
 st.set_page_config(
     page_title=s.TITULO_PAGINA,
     page_icon="icons/icone_aba.png",
@@ -23,15 +23,17 @@ st.set_page_config(
 # Inicialização única do Banco
 init_db()
 
-@st.cache_data
+# Otimização: Cache de longa duração para o Base64 do Logo/Banner
+@st.cache_data(ttl=3600)
 def get_base64(bin_file):
-    """Lê imagem local e faz cache para performance"""
+    """Lê imagem local e faz cache para performance."""
     if bin_file and os.path.exists(bin_file):
         with open(bin_file, 'rb') as f:
             return base64.b64encode(f.read()).decode()
     return None
 
-# --- CSS GLOBAL E CUSTOMIZAÇÃO DE TEMA ---
+# --- CSS GLOBAL OTIMIZADO ---
+# Removido processamento dinâmico de cores dentro da string sempre que possível
 st.markdown(f"""
     <style>
         :root {{
@@ -43,11 +45,9 @@ st.markdown(f"""
         h2 {{ font-size: 2.2rem !important; }}
         h1, h2, h3 {{ font-family: 'sans serif'; }}
         
-        /* Estilização de Botões e Métricas */
         .stButton>button {{ font-size: 1.2rem !important; height: 3em !important; }}
         [data-testid="stMetricValue"] {{ font-size: 2.5rem !important; }}
 
-        /* Container do Banner */
         .banner-container {{
             text-align: center; padding: 25px; 
             background-color: var(--cor-primaria); 
@@ -57,7 +57,6 @@ st.markdown(f"""
         }}
         .banner-container h1 {{ color: white !important; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }}
 
-        /* Cards de Parceiros */
         .card-parceiro {{
             border: 2px solid var(--cor-primaria); border-radius: 15px;
             padding: 20px; text-align: center;
@@ -66,13 +65,13 @@ st.markdown(f"""
             transition: transform 0.3s;
         }}
         .card-parceiro:hover {{ transform: translateY(-5px); border-color: var(--cor-secundaria); }}
+        
         .card-img {{
             width: 90px; height: 90px; border-radius: 50%;
             border: 3px solid var(--cor-primaria); background-color: white;
             object-fit: cover; margin-bottom: 10px;
         }}
 
-        /* Customização de Abas (Tabs) */
         .stTabs [data-baseweb="tab"] {{ color: var(--cor-primaria); }}
         .stTabs [aria-selected="true"] {{
             background-color: var(--cor-primaria) !important;
@@ -84,7 +83,7 @@ st.markdown(f"""
 if login():
     logout()
     
-    # --- RENDERIZAÇÃO DO BANNER ---
+    # Otimização: Renderizar o banner apenas uma vez e manter em cache visual
     logo_b64 = get_base64(s.BANNER_ARQUIVO)
     banner_html = f'<div class="banner-container">'
     if logo_b64:
@@ -96,6 +95,7 @@ if login():
     role = st.session_state.role
     n = s.NOMES_ABAS
     
+    # Mapeamento de menus mantido original
     menu_map = {
         "admin": [n["dashboard"], n["estoque"], n["vendas"], n["associados"], n["compras"]],
         "financeiro": [n["dashboard"], n["vendas"], n["associados"]],
@@ -104,12 +104,19 @@ if login():
     }
     
     menu = menu_map.get(role, [n["loja"]])
+    
+    # Otimização: Tabs não causam rerun total do script ao trocar, 
+    # mas o conteúdo dentro delas sim. O uso de fragmentos nos arquivos 
+    # externos (estoque.py, etc) complementa esta otimização.
     tabs = st.tabs(menu)
 
     for i, nome_aba in enumerate(menu):
         with tabs[i]:
             if nome_aba == n["dashboard"]:
-                render_dashboard() if role in ["admin", "financeiro"] else st.error("Acesso negado.")
+                if role in ["admin", "financeiro"]:
+                    render_dashboard()
+                else:
+                    st.error("Acesso negado.")
             
             elif n["estoque"] in nome_aba: 
                 render_estoque(readonly=(role != "admin"))

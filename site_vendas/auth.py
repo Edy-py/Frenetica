@@ -28,6 +28,7 @@ USERS = {
 }
 
 def login():
+    """Gere o acesso ao sistema sem disparar reruns excessivos."""
     if "auth" not in st.session_state:
         st.session_state.auth = False
         st.session_state.role = None
@@ -38,15 +39,19 @@ def login():
             st.markdown("### 🦣 Portal Frenética")
             st.caption("Sistema de Gestão de Vendas e Associados")
             
-            u = st.text_input("Usuário").lower().strip()
-            p = st.text_input("Senha", type="password")
+            # Uso de formulário para agrupar inputs e evitar rerun a cada tecla digitada
+            with st.form("login_form", clear_on_submit=False):
+                u = st.text_input("Usuário").lower().strip()
+                p = st.text_input("Senha", type="password")
+                submit = st.form_submit_button("Entrar", use_container_width=True, type="primary")
             
-            if st.button("Entrar", use_container_width=True, type="primary"):
+            if submit:
                 if u in USERS:
+                    # O bcrypt é lento; validar apenas no clique do botão é o correto
                     if bcrypt.checkpw(p.encode('utf-8'), USERS[u]["pass"]):
                         st.session_state.auth = True
                         st.session_state.role = USERS[u]["role"]
-                        st.rerun()
+                        st.rerun() # Único rerun necessário para libertar o menu principal
                     else:
                         st.error("Senha incorreta.")
                 else:
@@ -55,8 +60,8 @@ def login():
     return True
 
 def logout():
+    """Exibe informações do utilizador e gere a saída."""
     st.sidebar.markdown("---")
-    # Exibe o cargo com um emoji para facilitar a identificação
     icon_map = {
         "admin": "⚡", 
         "financeiro": "💰", 
@@ -67,8 +72,9 @@ def logout():
     role = st.session_state.role
     st.sidebar.write(f"{icon_map.get(role, '👤')} Nível: **{role.upper()}**")
     
-    if st.sidebar.button("🚪 Sair", use_container_width=True):
-        # Limpa todas as variáveis de estado para segurança
+    # Callback para logout evita rerun manual e limpa o estado de uma só vez
+    def perform_logout():
         for key in list(st.session_state.keys()):
             del st.session_state[key]
-        st.rerun()
+            
+    st.sidebar.button("🚪 Sair", use_container_width=True, on_click=perform_logout)
