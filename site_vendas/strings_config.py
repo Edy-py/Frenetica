@@ -197,3 +197,10 @@ MSG_SUCESSO_PARCERIA = "Parceria adicionada com sucesso"
 MSG_ERRO_SOCIO_NAO_ENCONTRADO = "CPF não encontrado!"
 
 LOGO_ARQUIVO = "midia/LOGOFNC.png"
+
+"""
+Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
+Desenvolvido por: Edílson Alves da Silva (Edy-py)
+Contato: edilsonalvesprofissional@gmail.com
+© 2026 - Todos os direitos reservados.
+"""
