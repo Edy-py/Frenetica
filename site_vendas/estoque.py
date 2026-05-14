@@ -155,7 +155,7 @@ def render_estoque(readonly=True):
                         st.rerun()
                     except Exception as e:
                         session.rollback()
-                        st.error(f"Erro ao excluir: {e}")
+                        
             else:
                 st.warning("ID não encontrado.")
 

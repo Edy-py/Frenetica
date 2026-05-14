@@ -196,7 +196,7 @@ MSG_SUCESSO_PARCERIA = "Parceria adicionada com sucesso"
 
 MSG_ERRO_SOCIO_NAO_ENCONTRADO = "CPF não encontrado!"
 
-LOGO_ARQUIVO = "midia/LOGOFNC.png"
+LOGO_ARQUIVO = "site_vendas/icons/icone_aba.png"
 
 # """
 # Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
