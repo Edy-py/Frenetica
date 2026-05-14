@@ -16,7 +16,7 @@ import strings_config as s
 # 1. Configuração da Página
 st.set_page_config(
     page_title=s.TITULO_PAGINA,
-    page_icon="icons/icone_aba.png",
+    page_icon="site_vendas/icons/icone_aba.png",
     layout="wide"
 )
 
