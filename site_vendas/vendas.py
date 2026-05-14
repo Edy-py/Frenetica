@@ -228,3 +228,10 @@ def render_vendas(can_edit_status=False):
                         clear_cache()
                         st.rerun()
     session.close()
+
+"""
+Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
+Desenvolvido por: Edílson Alves da Silva (Edy-py)
+Contato: edilsonalvesprofissional@gmail.com
+© 2026 - Todos os direitos reservados.
+"""
