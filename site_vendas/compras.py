@@ -152,9 +152,20 @@ def render_loja_dinamica(session):
         cols = st.columns(3)
         for idx, p in enumerate(prods):
             with cols[idx % 3]:
-                path = f"Frenetica/site_vendas/imagens/produtos/{p.foto_url}"
-                b64 = get_base64_image(path) if p.foto_url and os.path.exists(path) else None
-                img_html = f'<img src="data:image/png;base64,{b64}" class="img-produto">' if b64 else '<div class="img-produto" style="display:flex;align-items:center;justify-content:center;">🖼️ Sem Foto</div>'
+                
+
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                path = os.path.join(base_dir, "imagens", "produtos", p.foto_url) if p.foto_url else ""
+
+                if not os.path.exists(path) and p.foto_url:
+                    path = os.path.join("imagens", "produtos", p.foto_url)
+
+                b64 = get_base64_image(path) if (path and os.path.exists(path)) else None
+                
+                if b64:
+                    img_html = f'<img src="data:image/png;base64,{b64}" class="img-produto">'
+                else:
+                    img_html = '<div class="img-produto" style="display:flex;align-items:center;justify-content:center;background:#e2e8f0;color:#64748b;font-weight:600;">🖼️ Sem Foto</div>'
                 
                 is_kit = "[KIT]" in p.nome_produto
                 
