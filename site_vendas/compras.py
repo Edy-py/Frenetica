@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+
+# """
+# Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
+# Desenvolvido por: Edílson Alves da Silva (Edy-py)
+# Contato: edilsonalvesprofissional@gmail.com
+# © 2026 - Todos os direitos reservados.
+# """
+
 from data_manager import clear_cache
 import streamlit as st
 import pandas as pd
@@ -11,7 +19,7 @@ from strings_config import VENDAS as v
 from strings_config import LOJA as l
 
 def render_venda_sucesso():
-    """Exibe instruções de pagamento para venda de balcão com PIX destacado."""
+    """Exibe instruções de pagamento com PIX destacado e link direto para o Financeiro."""
     if "ultimo_pedido" in st.session_state:
         pedido = st.session_state.ultimo_pedido
     elif "ultimo_pedido_balcao" in st.session_state:
@@ -20,8 +28,6 @@ def render_venda_sucesso():
         return
 
     st.balloons()
-    
-    # CSS para destacar a área do PIX
     st.markdown(f"""
         <style>
             .pix-box {{
@@ -48,7 +54,7 @@ def render_venda_sucesso():
     """, unsafe_allow_html=True)
     
     with st.container(border=True):
-        st.success(f"### 🎉 Pedido de {pedido['cliente']} registrado!")
+        st.success(f"### 🎉 Pedido de {pedido['cliente']} registrado com sucesso!")
         st.write(f"**Valor total:** {format_currency(pedido['total'])}")
         
         if pedido['metodo'] == "Pix":
@@ -58,23 +64,21 @@ def render_venda_sucesso():
                     <span class="pix-key">{s.FINANCEIRO_PIX.replace("## ", "")}</span>
                 </div>
             """, unsafe_allow_html=True)
-            st.link_button("📲 Enviar Comprovante (WhatsApp Alfredo)", s.LINK_WHATSAPP_FIN, use_container_width=True, type="primary")
+            st.link_button("📲 Enviar Comprovante para o Financeiro", s.LINK_WHATSAPP_FIN, use_container_width=True, type="primary")
         
         elif "Cartão" in pedido['metodo']:
             st.warning(s.MSG_PAGAMENTO_CARTAO.format(valor=format_currency(pedido['total'])))
-            st.link_button("💳 Solicitar Link de Pagamento", s.LINK_WHATSAPP_FIN, use_container_width=True, type="primary")
+            st.link_button("💳 Solicitar Link de Pagamento (WhatsApp)", s.LINK_WHATSAPP_FIN, use_container_width=True, type="primary")
             
-        if st.button("Nova Compra / Voltar", use_container_width=True):
+        if st.button("Nova Compra / Voltar à Vitrine", use_container_width=True):
             if "ultimo_pedido" in st.session_state: del st.session_state.ultimo_pedido
             if "ultimo_pedido_balcao" in st.session_state: del st.session_state.ultimo_pedido_balcao
             st.rerun()
 
 @st.fragment
 def render_loja_dinamica(session):
-    """Fragmento que isola a vitrine e o carrinho para evitar recarregamento total."""
     desconto_ativo = st.session_state.get("socio_logado") is not None
     
-    # --- CSS PREMIUM PARA VITRINE ---
     st.markdown(f"""
         <style>
             .card-produto {{
@@ -87,13 +91,12 @@ def render_loja_dinamica(session):
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                height: 450px; /* Altura fixa para alinhar a grade */
+                height: 450px;
                 text-align: center;
                 overflow: hidden;
                 margin-bottom: 20px;
                 position: relative;
             }}
-
             .card-produto:hover {{
                 transform: translateY(-10px);
                 box-shadow: 0 25px 50px rgba(0,0,0,0.12);
@@ -102,7 +105,6 @@ def render_loja_dinamica(session):
                 min-height: 450px;
                 z-index: 10;
             }}
-
             .img-produto {{
                 width: 100%;
                 height: 200px;
@@ -111,7 +113,6 @@ def render_loja_dinamica(session):
                 margin-bottom: 15px;
                 background: #f8fafc;
             }}
-
             .titulo-produto {{
                 font-size: 1.3rem !important;
                 color: #1e293b !important;
@@ -120,15 +121,14 @@ def render_loja_dinamica(session):
                 height: 50px;
                 display: flex;
                 align-items: center;
+                justify-content: center;
             }}
-
             .preco-produto {{
                 color: {s.COR_AZUL_MARCA};
                 font-size: 1.6rem;
                 font-weight: 800;
                 margin: 5px 0;
             }}
-
             .desc-produto {{
                 font-size: 0.95rem;
                 color: #64748b;
@@ -138,7 +138,6 @@ def render_loja_dinamica(session):
                 overflow: hidden;
                 transition: all 0.3s ease;
             }}
-
             .card-produto:hover .desc-produto {{
                 -webkit-line-clamp: unset;
                 display: block;
@@ -146,65 +145,52 @@ def render_loja_dinamica(session):
         </style>
     """, unsafe_allow_html=True)
 
-    # --- VITRINE ---
     prods = session.query(Estoque).filter(Estoque.quantidade > 0).all()
     if prods:
         cols = st.columns(3)
         for idx, p in enumerate(prods):
             with cols[idx % 3]:
-                
-
+                # Resolução do caminho dinâmico para Deploy Cloud das Fotos
                 base_dir = os.path.dirname(os.path.abspath(__file__))
                 path = os.path.join(base_dir, "imagens", "produtos", p.foto_url) if p.foto_url else ""
-
                 if not os.path.exists(path) and p.foto_url:
                     path = os.path.join("imagens", "produtos", p.foto_url)
 
                 b64 = get_base64_image(path) if (path and os.path.exists(path)) else None
+                img_html = f'<img src="data:image/png;base64,{b64}" class="img-produto">' if b64 else '<div class="img-produto" style="display:flex;align-items:center;justify-content:center;background:#f1f5f9;color:#94a3b8;">🖼️ Sem Foto</div>'
                 
-                if b64:
-                    img_html = f'<img src="data:image/png;base64,{b64}" class="img-produto">'
-                else:
-                    img_html = '<div class="img-produto" style="display:flex;align-items:center;justify-content:center;background:#e2e8f0;color:#64748b;font-weight:600;">🖼️ Sem Foto</div>'
-                
+                # --- TRAVA DE DESCONTO PARA KITS ---
                 is_kit = "[KIT]" in p.nome_produto
-                
-                # Aplica desconto apenas se NÃO for kit
                 if desconto_ativo and not is_kit:
                     v_unitario = p.preco_venda_un * (1 - s.DESCONTO_VALOR)
                 else:
                     v_unitario = p.preco_venda_un
                 
-                # Render do Card HTML
                 st.markdown(f"""
                     <div class="card-produto">
                         {img_html}
                         <div class="titulo-produto">{p.nome_produto}</div>
                         <div class="preco-produto">{format_currency(v_unitario)}</div>
-                        <p class="desc-produto">Produto oficial da {s.ATLETICA_NOME}. Alta qualidade para o associado frenético!</p>
+                        <p class="desc-produto">Produto oficial da {s.ATLETICA_NOME}. Estilo e qualidade garantidos para o associado frenético!</p>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # Botão integrado
                 def add_ao_carrinho(prod=p, preco=v_unitario):
                     st.session_state.carrinho_cliente.append({
                         "id_db": prod.id, "nome": prod.nome_produto, "preco": preco,
                         "personalizavel": prod.personalizavel, "personalizacao": ""
                     })
-                    st.toast(f"✅ {prod.nome_produto} adicionado!")
+                    st.toast(f"🛒 {prod.nome_produto} adicionado!")
 
                 st.button(f"🛒 Adicionar", key=f"btn_{p.id}", use_container_width=True, on_click=add_ao_carrinho)
 
-    # --- CARRINHO E FINALIZAÇÃO ---
     if st.session_state.carrinho_cliente:
         st.divider()
         st.subheader("🛒 Seu Carrinho")
-        
         df_cart = pd.DataFrame(st.session_state.carrinho_cliente)
         st.table(df_cart[['nome', 'preco']].assign(
             Preço=df_cart['preco'].apply(format_currency))[['nome', 'Preço']].rename(columns={'nome':'Produto'})
         )
-        
         total_final = df_cart['preco'].sum()
         st.markdown(f"### Total: :green[{format_currency(total_final)}]")
 
@@ -215,7 +201,6 @@ def render_loja_dinamica(session):
             tamanho_sel = c2.selectbox(v["LABEL_TAMANHO"], v["OPCOES_TAMANHO"], key="compra_tamanho")
             
             socio_info = st.session_state.get("socio_logado")
-            
             if not socio_info:
                 nome_cli_input = st.text_input(v["LABEL_NOME_CLIENTE"], placeholder="Nome para o pedido")
                 tel_cli_input = st.text_input(v["LABEL_TEL_CLIENTE"], placeholder=s.PLACEHOLDER_TELEFONE)
@@ -238,7 +223,6 @@ def render_loja_dinamica(session):
                     try:
                         nome_final = clean_text(nome_cli_input)
                         tel_final = tel_cli_input
-                        
                         if not socio_info:
                             sucesso_tel, tel_final = validar_telefone(tel_cli_input)
                             if not sucesso_tel:
@@ -256,16 +240,12 @@ def render_loja_dinamica(session):
                                 personalizacao=perso, metodo_pagamento=metodo_sel,
                                 is_associado=desconto_ativo
                             ))
-                            if prod_db: prod_db.quantidade -= 1
+                            if prod_db and not "[KIT]" in prod_db.nome_produto: 
+                                prod_db.quantidade -= 1
 
                         session.commit()
                         clear_cache()
-                        
-                        st.session_state.ultimo_pedido = {
-                            "total": total_final,
-                            "metodo": metodo_sel,
-                            "cliente": nome_final
-                        }
+                        st.session_state.ultimo_pedido = {"total": total_final, "metodo": metodo_sel, "cliente": nome_final}
                         st.session_state.carrinho_cliente = []
                         st.rerun()
                     except Exception as e:
@@ -279,10 +259,14 @@ def render_loja_dinamica(session):
 def render_compras():
     session = get_session()
     
+    # Executa a limpeza automática silenciosa ao carregar a loja
+    from associados import atualizar_expiracao_socios
+    atualizar_expiracao_socios(session)
+    
     if 'carrinho_cliente' not in st.session_state:
         st.session_state.carrinho_cliente = []
 
-    st.markdown(f'<h2 style="text-align: center; color: {s.COR_AZUL_MARCA};">{l["TITULO"]}</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 style="text-align: center; color:{s.COR_AZUL_MARCA};">{l["TITULO"]}</h2>', unsafe_allow_html=True)
 
     with st.sidebar:
         st.header(l["HEADER_SOCIO"])
@@ -295,9 +279,7 @@ def render_compras():
                     _, cpf_busca = validar_cpf(cod_promo)
                     socio = session.query(Associados).filter_by(codigo_unico=cpf_busca, status="Ativo").first()
                     if socio:
-                        st.session_state.socio_logado = {
-                            "nome": socio.nome, "cpf": socio.codigo_unico, "telefone": socio.telefone
-                        }
+                        st.session_state.socio_logado = {"nome": socio.nome, "cpf": socio.codigo_unico, "telefone": socio.telefone}
                         st.rerun()
                     else:
                         st.error("Sócio não encontrado ou inativo.")
@@ -326,16 +308,9 @@ def render_compras():
                             session.rollback()
                             st.error("CPF já cadastrado.")
 
-    if "ultimo_pedido" in st.session_state:
+    if "ultimo_pedido" in st.session_state or "ultimo_pedido_balcao" in st.session_state:
         render_venda_sucesso()
     else:
         render_loja_dinamica(session)
         
     session.close()
-
-# """
-# Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
-# Desenvolvido por: Edílson Alves da Silva (Edy-py)
-# Contato: edilsonalvesprofissional@gmail.com
-# © 2026 - Todos os direitos reservados.
-# """

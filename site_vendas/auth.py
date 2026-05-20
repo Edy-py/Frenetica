@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+
+# """
+# Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
+# Desenvolvido por: Edílson Alves da Silva (Edy-py)
+# Contato: edilsonalvesprofissional@gmail.com
+# © 2026 - Todos os direitos reservados.
+# """
+
 import streamlit as st
 import base64
 import os
@@ -156,10 +164,3 @@ def logout():
             del st.session_state[key]
             
     st.sidebar.button("🚪 Encerrar Sessão", use_container_width=True, on_click=perform_logout)
-
-# """
-# Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
-# Desenvolvido por: Edílson Alves da Silva (Edy-py)
-# Contato: edilsonalvesprofissional@gmail.com
-# © 2026 - Todos os direitos reservados.
-# """

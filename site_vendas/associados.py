@@ -1,7 +1,16 @@
 # -*- coding: utf-8 -*-
+
+# """
+# Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
+# Desenvolvido por: Edílson Alves da Silva (Edy-py)
+# Contato: edilsonalvesprofissional@gmail.com
+# © 2026 - Todos os direitos reservados.
+# """
+
 import streamlit as st
 import pandas as pd
 import os
+import datetime
 from database import get_session, Associados, Parceiros
 from utils import clean_text, get_base64_image, format_telefone, validar_cpf, validar_telefone, salvar_imagem
 import strings_config as s 
@@ -9,9 +18,28 @@ from data_manager import clear_cache
 
 so = s.SOCIOS 
 
+def atualizar_expiracao_socios(session):
+    """Varre o banco de dados e desativa sócios com mais de 30 dias de ativação."""
+    try:
+        agora = datetime.datetime.now()
+        prazo_limite = agora - datetime.timedelta(days=30)
+        
+        socios_expirados = session.query(Associados).filter(
+            Associados.status == "Ativo",
+            Associados.data_ativacao <= prazo_limite
+        ).all()
+        
+        if socios_expirados:
+            for socio in socios_expirados:
+                socio.status = "Inativo"
+                socio.data_ativacao = None
+            session.commit()
+            clear_cache()
+    except Exception as e:
+        session.rollback()
+
 @st.fragment
 def render_verificacao_cpf(session):
-    """Fragmento para verificar CPF sem recarregar a página toda."""
     st.subheader("Verificar CPF")
     cod_verificar = st.text_input("Digite o CPF", key="input_verificar_parceiro")
     if st.button("Verificar Status", use_container_width=True, type="primary"):
@@ -28,18 +56,19 @@ def render_verificacao_cpf(session):
 def render_associados():
     st.header(f"Parceiros da {s.ATLETICA_NOME}") 
     session = get_session()
+    
+    # Executa a limpeza automática silenciosa ao abrir a aba
+    atualizar_expiracao_socios(session)
+    
     role = st.session_state.role
 
-    # --- PERFIL: PARCEIRO ---
     if role == "parceiro":
         render_verificacao_cpf(session)
 
-    # --- PERFIL: ADMIN ---
     if role == "admin":
         tab1, tab2 = st.tabs([so["TAB_GERENCIAR_SOCIOS"], so["TAB_GERENCIAR_PARCEIROS"]])
         
         with tab1:
-            # Gerenciamento de Sócios (Mantido original)
             with st.expander(so["EXPANDER_CADASTRO"], expanded=False):
                 with st.form("form_cad_socio", clear_on_submit=True):
                     c1, c2, c3 = st.columns(3)
@@ -56,16 +85,20 @@ def render_associados():
                         elif not sucesso_tel: st.error(s.MSG_ERRO_TELEFONE)
                         else:
                             try:
-                                session.add(Associados(nome=clean_text(nome_s), telefone=tel_limpo, codigo_unico=cpf_limpo, status="Ativo"))
+                                session.add(Associados(
+                                    nome=clean_text(nome_s), telefone=tel_limpo, 
+                                    codigo_unico=cpf_limpo, status="Ativo",
+                                    data_ativacao=datetime.datetime.now()
+                                ))
                                 session.commit()
                                 clear_cache()
                                 st.success(so["MSG_SUCESSO"])
+                                st.rerun()
                             except:
                                 session.rollback()
                                 st.error(so["MSG_EXISTE"])
 
         with tab2:
-            # --- CADASTRO DE PARCEIROS ---
             with st.expander("➕ Cadastrar Novos Parceiros", expanded=False):
                 with st.form("form_cad_parceiro", clear_on_submit=True):
                     nome_p = st.text_input("Nome da empresa")
@@ -85,7 +118,6 @@ def render_associados():
                                 session.rollback()
                                 st.error("Erro ao salvar parceiro.")
 
-            # --- EDIÇÃO E EXCLUSÃO DE PARCEIROS ---
             st.divider()
             st.subheader("⚙️ Gerenciar Parceiros Existentes")
             parceiros_lista = session.query(Parceiros).all()
@@ -113,7 +145,6 @@ def render_associados():
                                     session.rollback()
                                     st.error("Erro ao atualizar parceiro.")
                             
-                            # Botão de Excluir dentro de um confirmação
                             if col_b2.form_submit_button("🗑️ Excluir Parceiro", use_container_width=True):
                                 try:
                                     session.delete(p)
@@ -123,10 +154,10 @@ def render_associados():
                                     st.rerun()
                                 except:
                                     session.rollback()
+                                    st.error("Erro ao remover parceiro.")
             else:
                 st.info("Nenhum parceiro cadastrado para gerenciar.")
 
-    # --- CONTROLE DE STATUS (FINANCEIRO / ADMIN) ---
     if role in ["admin", "financeiro"]:
         st.divider()
         with st.expander(so["EXPANDER_STATUS"], expanded=False):
@@ -147,6 +178,10 @@ def render_associados():
                                          index=(0 if socio_edit.status == "Ativo" else 1))
                 if st.button("Confirmar Alteração", use_container_width=True, type="primary"):
                     socio_edit.status = novo_status
+                    if novo_status == "Ativo":
+                        socio_edit.data_ativacao = datetime.datetime.now()
+                    else:
+                        socio_edit.data_ativacao = None
                     session.commit() 
                     clear_cache()
                     st.success("Status Atualizado!")
@@ -160,7 +195,6 @@ def render_associados():
             df_as = pd.DataFrame([{"Nome": socio.nome, "CPF": socio.codigo_unico, "Status": socio.status, "Telefone": format_telefone(socio.telefone)} for socio in todos])
             st.dataframe(df_as, use_container_width=True, hide_index=True)
 
-    # --- VISUALIZAÇÃO DE CARDS (VISÍVEL PARA TODOS) ---
     st.divider()
     st.subheader(f"Benefícios {s.ATLETICA_NOME}")
     lista_parceiros_view = session.query(Parceiros).all()
@@ -168,18 +202,14 @@ def render_associados():
         cols = st.columns(3)
         for idx, p in enumerate(lista_parceiros_view):
             with cols[idx % 3]:
-                caminho = os.path.join("imagens", "parceiros", p.logo_url) if p.logo_url else ""
-                b64 = get_base64_image(caminho)
-                img_tag = f'<img src="data:image/png;base64,{b64}" class="card-img">' if b64 else '<div class="card-icon"></div>'
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                caminho = os.path.join(base_dir, "imagens", "parceiros", p.logo_url) if p.logo_url else ""
+                if not os.path.exists(caminho) and p.logo_url:
+                    caminho = os.path.join("imagens", "parceiros", p.logo_url)
+                b64 = get_base64_image(caminho) if os.path.exists(caminho) else None
+                img_tag = f'<img src="data:image/png;base64,{b64}" class="card-img">' if b64 else '<div class="card-icon" style="height:100px;width:100px;background:#eee;border-radius:50%;margin-bottom:15px;"></div>'
                 st.markdown(f'<div class="card-parceiro">{img_tag}<h3 class="card-title">{p.nome}</h3><p class="card-text">{p.vantagem}</p></div>', unsafe_allow_html=True)
     else: 
         st.info("Em breve novas parcerias!")
 
     session.close()
-
-# """
-# Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
-# Desenvolvido por: Edílson Alves da Silva (Edy-py)
-# Contato: edilsonalvesprofissional@gmail.com
-# © 2026 - Todos os direitos reservados.
-# """

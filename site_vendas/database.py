@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+
+# """
+# Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
+# Desenvolvido por: Edílson Alves da Silva (Edy-py)
+# Contato: edilsonalvesprofissional@gmail.com
+# © 2026 - Todos os direitos reservados.
+# """
+
 import streamlit as st
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime
 from sqlalchemy.ext.declarative import declarative_base
@@ -43,6 +51,7 @@ class Associados(Base):
     codigo_unico = Column(String, unique=True)
     status = Column(String, default="Ativo")
     telefone = Column(String)
+    data_ativacao = Column(DateTime, nullable=True)
 
 class Parceiros(Base):
     __tablename__ = 'parceiros'
@@ -93,9 +102,3 @@ Session = sessionmaker(bind=engine)
 def get_session():
     return Session()
 
-# """
-# Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
-# Desenvolvido por: Edílson Alves da Silva (Edy-py)
-# Contato: edilsonalvesprofissional@gmail.com
-# © 2026 - Todos os direitos reservados.
-# """

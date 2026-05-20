@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+
+# """
+# Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
+# Desenvolvido por: Edílson Alves da Silva (Edy-py)
+# Contato: edilsonalvesprofissional@gmail.com
+# © 2026 - Todos os direitos reservados.
+# """
+
 from utils import format_currency
 
 # ==============================================================================
@@ -198,9 +206,3 @@ MSG_ERRO_SOCIO_NAO_ENCONTRADO = "CPF não encontrado!"
 
 LOGO_ARQUIVO = "site_vendas/icons/icone_aba.png"
 
-# """
-# Sistema de Gestão e Vendas - Frenética (A.A.A.T.J.B.)
-# Desenvolvido por: Edílson Alves da Silva (Edy-py)
-# Contato: edilsonalvesprofissional@gmail.com
-# © 2026 - Todos os direitos reservados.
-# """
