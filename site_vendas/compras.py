@@ -152,7 +152,7 @@ def render_loja_dinamica(session):
         cols = st.columns(3)
         for idx, p in enumerate(prods):
             with cols[idx % 3]:
-                path = f"imagens/produtos/{p.foto_url}"
+                path = f"Frenetica/site_vendas/imagens/produtos/{p.foto_url}"
                 b64 = get_base64_image(path) if p.foto_url and os.path.exists(path) else None
                 img_html = f'<img src="data:image/png;base64,{b64}" class="img-produto">' if b64 else '<div class="img-produto" style="display:flex;align-items:center;justify-content:center;">🖼️ Sem Foto</div>'
                 
